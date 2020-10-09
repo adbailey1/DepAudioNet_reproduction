@@ -1,0 +1,34 @@
+# --------------------------------------------
+# Executable and its arguments
+executable = /user/HS227/ab01814/pycharm_projects/daic_exp_1/run_uni.sh
+arguments =
+
+# ---------------------------------------------------
+# Docker: Executable might be stated in docker image so can be omitted
+# If specified, overrides the one stated in docker image
+# Need to specify the docker image to use
+universe = vanilla
+
+# -------------------------------------------------
+# Input, Output and Log files
+log = /vol/research/ab01814_res/daic_woz_2/condor_logs/$(cluster).$(process).log
+output = /vol/research/ab01814_res/daic_woz_2/condor_logs/$(cluster).$(process).out
+error = /vol/research/ab01814_res/daic_woz_2/condor_logs/$(cluster).$(process).error
+
+should_transfer_files = YES
+
+# -------------------------------------
+# Requirements for the Job
+requirements = (CUDACapability > 5.2) && (CUDACapability <= 7.0)
+# requirements = (Machine == "bofur.eps.surrey.ac.uk")
+# requirements = (Machine == "dori.eps.surrey.ac.uk")
+
+# --------------------------------------
+# Resource requirements
+request_GPUs = 1
+request_CPUs = 2
+request_memory = 12000
+
+# -----------------------------------
+# Queue commands
+queue 1
