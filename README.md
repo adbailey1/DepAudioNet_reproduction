@@ -1,6 +1,8 @@
 **Prerequisites**
 
-Install miniconda and load the environment file from environment.yml file
+This was created using Python 3.7, future versions of Python may not be compatible with the packages in the environment files. 
+
+Install miniconda and load the environment file from environment_conda.yml file
 
 `conda env create -f environment.yml`
 
