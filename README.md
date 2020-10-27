@@ -26,7 +26,7 @@ For this experiment, the DAIC-WOZ dataset is used. This can be obtained
 Use the config file to set experiment preferences and locations of the code, workspace, and dataset directories. There are two config files here. config.py is usually used as a template and further config files are added with the suffix '_1', '_2' etc for different experiments. 
 
 Updated the run.sh file if you want to run the experiment through bash (call
- ./run.sh from terminal). The arguments required by calling main.py
+ ./run.sh from terminal). The arguments required by calling main1.py
   are: 
  - train - to train a model 
 - test - to test a trained model
@@ -41,7 +41,7 @@ Optional commands are:
 For example: To run a training experiment without bash, using a validation
  set, GPU, and not visualising the per epoch results graphs
  
- `python3 main.py train --validate --cuda --server`
+ `python3 main1.py train --validate --cuda --server`
  
 **Results Mel**
 
@@ -73,11 +73,15 @@ MIN_CROP = True
 ANALYSIS_MODE = 'epoch'
 ```
 
-NOTE: The mel-spectrogram needs to be computed following Ma et al. {DepAudioNet} procedure: calculated mel spectrogram per file and calculate: (file - mean) / standard deviation
+NOTE: The mel-spectrogram needs to be computed following Ma et al. {DepAudioNet: An Efficient Deep Model for Audio based Depression Classification (https://dl.acm.org/doi/10.1145/2988257.2988267)} procedure: calculated mel spectrogram per file and calculate: (file - mean) / standard deviation
 
-Use "CustomMel7" for training.
+Change in main1.py:
+- Use "CustomMel7" for training.
+`from exp_run.models_pytorch import CustomMel7 as CustomMel`
+- Use Learning rate Update = 2
+`learn_rate_factor = 2`
 
-Results:  Learning Rate update=2 
+Results:  Learning Rate update=2
 ```
 |F1(ND)|F1(D) |F1 avg|
 | .725 | .520 | .622 |
@@ -122,7 +126,11 @@ ANALYSIS_MODE = 'epoch'
 
 NOTE: The raw audio needs to be computed in the same way as the mel spectrogram according to: (file - mean) / standard deviation
 
-Use "CustomRaw3" for training.
+Change in main1.py:
+- Use "CustomRaw3" for training.
+`from exp_run.models_pytorch import CustomRaw3 as CustomRaw`
+- Use Learning rate Update = 2
+`learn_rate_factor = 2`
 
 Results:  Learning Rate update=2 
 ```
