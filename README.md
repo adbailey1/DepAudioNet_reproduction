@@ -42,6 +42,87 @@ For example: To run a training experiment without bash, using a validation
  set, GPU, and not visualising the per epoch results graphs
  
  `python3 main.py train --validate --cuda --server`
+ 
+**Results Mel**
+
+We replicated DepAduioNet's reported results by using the following config settings:
+`EXPERIMENT_DETAILS = {'FEATURE_EXP': 'mel',
+                      'CLASS_WEIGHTS': False,
+                      'USE_GENDER_WEIGHTS': False,
+                      'SUB_SAMPLE_ND_CLASS': True,  # Make len(dep) == len(
+                      # ndep)
+                      'CROP': True,
+                      'OVERSAMPLE': False,
+                      'SPLIT_BY_GENDER': True,  # Only for use in test mode
+                      'FEATURE_DIMENSIONS': 120,
+                      'FREQ_BINS': 40,
+                      'BATCH_SIZE': 20,
+                      'SVN': True,
+                      'LEARNING_RATE': 1e-3,
+                      'SEED': 1000,
+                      'TOTAL_EPOCHS': 100,
+                      'TOTAL_ITERATIONS': 3280,
+                      'ITERATION_EPOCH': 1,
+                      'SUB_DIR': 'exp_1',
+                      'EXP_RUNTHROUGH': 5}
+# Determine the level of crop, min file found in training set or maximum file
+# per set (ND / D) or (FND, MND, FD, MD)
+MIN_CROP = True
+# Determine whether the experiment is run in terms of 'epoch' or 'iteration'
+ANALYSIS_MODE = 'epoch'`
+
+NOTE: The mel-spectrogram needs to be computed following Ma et al. {DepAudioNet} procedure: calculated mel spectrogram per file and calculate: (file - mean) / standard deviation
+
+Use "CustomMel7" for training.
+
+Results:  Learning Rate update=2 
+|F1(ND)|F1(D) |F1 avg|
+| .725 | .520 | .622 |
+
+Results:  Learning Rate update=3
+|F1(ND)|F1(D) |F1 avg|
+| .750 | .511 | .631 | 
+
+
+**Results Raw**
+
+We replicated DepAduioNet's reported results by using the following config settings:
+`EXPERIMENT_DETAILS = {'FEATURE_EXP': 'raw',
+                      'CLASS_WEIGHTS': False,
+                      'USE_GENDER_WEIGHTS': False,
+                      'SUB_SAMPLE_ND_CLASS': True,  # Make len(dep) == len(
+                      # ndep)
+                      'CROP': True,
+                      'OVERSAMPLE': False,
+                      'SPLIT_BY_GENDER': True,  # Only for use in test mode
+                      'FEATURE_DIMENSIONS': 61440,
+                      'FREQ_BINS': 1,
+                      'BATCH_SIZE': 20,
+                      'SVN': True,
+                      'LEARNING_RATE': 1e-3,
+                      'SEED': 1000,
+                      'TOTAL_EPOCHS': 100,
+                      'TOTAL_ITERATIONS': 3280,
+                      'ITERATION_EPOCH': 1,
+                      'SUB_DIR': 'exp_1',
+                      'EXP_RUNTHROUGH': 5}
+# Determine the level of crop, min file found in training set or maximum file
+# per set (ND / D) or (FND, MND, FD, MD)
+MIN_CROP = True
+# Determine whether the experiment is run in terms of 'epoch' or 'iteration'
+ANALYSIS_MODE = 'epoch'`
+
+NOTE: The raw audio needs to be computed in the same way as the mel spectrogram according to: (file - mean) / standard deviation
+
+Use "CustomRaw3" for training.
+
+Results:  Learning Rate update=2 
+|F1(ND)|F1(D) |F1 avg|
+| .738 | .510 | .624 |
+
+Results:  Learning Rate update=3
+|F1(ND)|F1(D) |F1 avg|
+| .765 | .568 | .667 | 
 
 **Notes**
 
