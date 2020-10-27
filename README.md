@@ -78,18 +78,23 @@ NOTE: The mel-spectrogram needs to be computed following Ma et al. {DepAudioNet}
 Use "CustomMel7" for training.
 
 Results:  Learning Rate update=2 
+```
 |F1(ND)|F1(D) |F1 avg|
 | .725 | .520 | .622 |
+```
 
 Results:  Learning Rate update=3
+```
 |F1(ND)|F1(D) |F1 avg|
 | .750 | .511 | .631 | 
+```
 
 
 **Results Raw**
 
 We replicated DepAduioNet's reported results by using the following config settings:
-`EXPERIMENT_DETAILS = {'FEATURE_EXP': 'raw',
+```
+EXPERIMENT_DETAILS = {'FEATURE_EXP': 'raw',
                       'CLASS_WEIGHTS': False,
                       'USE_GENDER_WEIGHTS': False,
                       'SUB_SAMPLE_ND_CLASS': True,  # Make len(dep) == len(
@@ -112,19 +117,24 @@ We replicated DepAduioNet's reported results by using the following config setti
 # per set (ND / D) or (FND, MND, FD, MD)
 MIN_CROP = True
 # Determine whether the experiment is run in terms of 'epoch' or 'iteration'
-ANALYSIS_MODE = 'epoch'`
+ANALYSIS_MODE = 'epoch'
+```
 
 NOTE: The raw audio needs to be computed in the same way as the mel spectrogram according to: (file - mean) / standard deviation
 
 Use "CustomRaw3" for training.
 
 Results:  Learning Rate update=2 
+```
 |F1(ND)|F1(D) |F1 avg|
 | .738 | .510 | .624 |
+```
 
 Results:  Learning Rate update=3
+```
 |F1(ND)|F1(D) |F1 avg|
 | .765 | .568 | .667 | 
+```
 
 **Notes**
 
