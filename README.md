@@ -46,7 +46,8 @@ For example: To run a training experiment without bash, using a validation
 **Results Mel**
 
 We replicated DepAduioNet's reported results by using the following config settings:
-```EXPERIMENT_DETAILS = {'FEATURE_EXP': 'mel',
+``
+EXPERIMENT_DETAILS = {'FEATURE_EXP': 'mel',
                       'CLASS_WEIGHTS': False,
                       'USE_GENDER_WEIGHTS': False,
                       'SUB_SAMPLE_ND_CLASS': True,  # Make len(dep) == len(
@@ -69,7 +70,7 @@ We replicated DepAduioNet's reported results by using the following config setti
 # per set (ND / D) or (FND, MND, FD, MD)
 MIN_CROP = True
 # Determine whether the experiment is run in terms of 'epoch' or 'iteration'
-ANALYSIS_MODE = 'epoch'```
+ANALYSIS_MODE = 'epoch'``
 
 NOTE: The mel-spectrogram needs to be computed following Ma et al. {DepAudioNet} procedure: calculated mel spectrogram per file and calculate: (file - mean) / standard deviation
 
