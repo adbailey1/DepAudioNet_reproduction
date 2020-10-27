@@ -43,7 +43,7 @@ For example: To run a training experiment without bash, using a validation
  
  `python3 main1.py train --validate --cuda --server`
  
-**Results Mel**
+**Results Mel-Spectrogram**
 
 We replicated DepAduioNet's reported results by using the following config settings:
 ```
@@ -73,7 +73,7 @@ MIN_CROP = True
 ANALYSIS_MODE = 'epoch'
 ```
 
-NOTE: The mel-spectrogram needs to be computed following Ma et al. {DepAudioNet: An Efficient Deep Model for Audio based Depression Classification (https://dl.acm.org/doi/10.1145/2988257.2988267)} procedure: calculated mel spectrogram per file and calculate: (file - mean) / standard deviation
+NOTE: The mel-spectrogram needs to be computed following Ma et al. {DepAudioNet: An Efficient Deep Model for Audio based Depression Classification (https://dl.acm.org/doi/10.1145/2988257.2988267)} procedure: calculated mel spectrogram per file and calculate: (file - mean) / standard deviation. Check out https://github.com/adbailey1/daic_woz_process for a pre-processing framework that should handle the feature database creation.
 
 Change in main1.py:
 - Use "CustomMel7" for training.
@@ -94,7 +94,7 @@ Results:  Learning Rate update=3
 ```
 
 
-**Results Raw**
+**Results Raw Audio**
 
 We replicated DepAduioNet's reported results by using the following config settings:
 ```
@@ -124,7 +124,7 @@ MIN_CROP = True
 ANALYSIS_MODE = 'epoch'
 ```
 
-NOTE: The raw audio needs to be computed in the same way as the mel spectrogram according to: (file - mean) / standard deviation
+NOTE: The raw audio needs to be computed in the same way as the mel spectrogram according to: (file - mean) / standard deviation. Check out https://github.com/adbailey1/daic_woz_process for a pre-processing framework that should handle the feature database creation.
 
 Change in main1.py:
 - Use "CustomRaw3" for training.
