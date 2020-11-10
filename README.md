@@ -45,6 +45,8 @@ For example: To run a training experiment without bash, using a validation
  
 **Results Mel-Spectrogram**
 
+All results are found in our paper: https://arxiv.org/abs/2010.15120
+
 We replicated DepAduioNet's reported results by using the following config settings:
 ```
 EXPERIMENT_DETAILS = {'FEATURE_EXP': 'mel',
