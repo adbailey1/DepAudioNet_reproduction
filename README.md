@@ -83,13 +83,13 @@ Change in main1.py:
 - Use Learning rate Update = 2
 `learn_rate_factor = 2`
 
-Results:  Learning Rate update=2
+Results on Dataset's Validation Set:  Learning Rate update=2
 ```
 |F1(ND)|F1(D) |F1 avg|
 | .725 | .520 | .622 |
 ```
 
-Results:  Learning Rate update=3
+Results on Dataset's Validation Set:  Learning Rate update=3
 ```
 |F1(ND)|F1(D) |F1 avg|
 | .750 | .511 | .631 | 
@@ -134,13 +134,13 @@ Change in main1.py:
 - Use Learning rate Update = 2
 `learn_rate_factor = 2`
 
-Results:  Learning Rate update=2 
+Results on Dataset's Validation Set:  Learning Rate update=2 
 ```
 |F1(ND)|F1(D) |F1 avg|
 | .738 | .510 | .624 |
 ```
 
-Results:  Learning Rate update=3
+Results on Dataset's Validation Set:  Learning Rate update=3
 ```
 |F1(ND)|F1(D) |F1 avg|
 | .765 | .568 | .667 | 
