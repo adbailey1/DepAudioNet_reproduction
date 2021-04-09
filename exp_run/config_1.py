@@ -1,5 +1,4 @@
 import os
-import sys
 
 # Use this string to write a brief detail about the current experiment. This
 # string will be saved in a logger for this particular experiment
@@ -12,13 +11,13 @@ EXPERIMENT_BRIEF = ''
 # Set to sub to use training/dev sets only
 # Network options: custom or custom_att (to use the attention mechanism)
 EXPERIMENT_DETAILS = {'FEATURE_EXP': 'mel',
-                      'CLASS_WEIGHTS': False,
+                      'CLASS_WEIGHTS': True,
                       'USE_GENDER_WEIGHTS': False,
                       'SUB_SAMPLE_ND_CLASS': True,  # Make len(dep) == len(
                       # ndep)
                       'CROP': True,
                       'OVERSAMPLE': False,
-                      'SPLIT_BY_GENDER': True,  # Only for use in test mode
+                      'SPLIT_BY_GENDER': False,  # Only for use in test mode
                       'FEATURE_DIMENSIONS': 120,
                       'FREQ_BINS': 40,
                       'BATCH_SIZE': 20,
@@ -28,7 +27,7 @@ EXPERIMENT_DETAILS = {'FEATURE_EXP': 'mel',
                       'TOTAL_EPOCHS': 100,
                       'TOTAL_ITERATIONS': 3280,
                       'ITERATION_EPOCH': 1,
-                      'SUB_DIR': 'exp_final27_raw1024',
+                      'SUB_DIR': 'exp_1',
                       'EXP_RUNTHROUGH': 5}
 # Determine the level of crop, min file found in training set or maximum file
 # per set (ND / D) or (FND, MND, FD, MD)
@@ -37,9 +36,12 @@ MIN_CROP = True
 ANALYSIS_MODE = 'epoch'
 
 # How to calculate the weights: 'macro' uses the number of individual
-# interviews, 'micro' uses the number of instances of both classes, 'both'
-# combines the macro and micro via the product, 'instance' uses the total
-# number of segments for each class to determine the weights.
+# interviews in the training set (e.g. 31 dep / 76 non-dep), 'micro' uses the
+# minimum number of segments of both classes (e.g. min_num_seg_dep=35,
+# therefore every interview in depressed class will be normalised according
+# to 35), 'both' combines the macro and micro via the product, 'instance'
+# uses the total number of segments for each class to determine the weights (
+# e.g. there could be 558 dep segs and 440 non-dep segs).
 WEIGHT_TYPE = 'instance'
 
 # Set to 'm' or 'f' to split into male or female respectively
@@ -87,12 +89,9 @@ else:
 if EXPERIMENT_DETAILS['USE_GENDER_WEIGHTS']:
     EXPERIMENT_DETAILS['SUB_DIR'] = EXPERIMENT_DETAILS['SUB_DIR'] + '_gen'
 
-
-
-DATASET = '/mnt/6663b3e6-a12f-49e8-b881-421cebf2f8c6/datasets/DAIC-WOZ'
-WORKSPACE_MAIN_DIR = '/mnt/6663b3e6-a12f-49e8-b881-421cebf2f8c6/daic_woz_2'
-WORKSPACE_FILES_DIR = os.path.join('/home', 'andrew', 'PycharmProjects',
-                                   'depaudionet')
+DATASET = '/path/to/DAIC-WOZ/dataset'
+WORKSPACE_MAIN_DIR = '/path/to/save/experiment/outputs'
+WORKSPACE_FILES_DIR = '/path/to/depaudionet/code'
 TRAIN_SPLIT_PATH = os.path.join(DATASET, 'train_split_Depression_AVEC2017.csv')
 DEV_SPLIT_PATH = os.path.join(DATASET, 'dev_split_Depression_AVEC2017.csv')
 TEST_SPLIT_PATH = os.path.join(DATASET, 'test_split_Depression_AVEC2017.csv')

@@ -185,10 +185,8 @@ class ConvBlock2d(nn.Module):
             input: torch.Tensor - The current input at this stage of the network
         """
         x = input
-        x_shape = x.shape
         if self.att:
             x = self.conv1(x)
-            # x = x.reshape(x_shape[0], -1)
             if self.act():
                 x = self.act(x)
         else:
@@ -261,15 +259,10 @@ class FullyConnected(nn.Module):
                     x = self.act(self.fc(x))
                 else:
                     x = self.fc(x)
-            # elif x.dim() == 3:
-            #     batch_size = x.shape[0]
-            #     x = self.fc(x)
-            #     x = self.act(x.reshape(batch_size, -1))
             else:
                 x = self.act(self.fc(x))
 
         return x
-
 
 def lstm_with_attention(net_params):
     if 'LSTM_1' in net_params:
@@ -297,8 +290,11 @@ def reshape_x(x):
     """
     Reshapes the input 'x' if there is a dimension of length 1
 
-    Input
+    Input:
         x: torch.Tensor - The input
+
+    Output:
+        x: torch.Tensor - Reshaped
     """
     dims = x.dim()
     if x.shape[1] == 1 and x.shape[2] == 1 and x.shape[3] == 1:
@@ -355,6 +351,7 @@ class CustomMel1(nn.Module):
 
         return x
 
+
 class CustomMel2(nn.Module):
     def __init__(self):
         super(CustomMel2, self).__init__()
@@ -388,6 +385,7 @@ class CustomMel2(nn.Module):
         x = self.fc(x[:, -1, :].reshape(batch, -1))
 
         return x
+
 
 class CustomMel3(nn.Module):
     def __init__(self):
@@ -493,6 +491,7 @@ class CustomMel5(nn.Module):
 
         return x
 
+
 class CustomMel6(nn.Module):
     def __init__(self):
         super(CustomMel6, self).__init__()
@@ -528,6 +527,7 @@ class CustomMel6(nn.Module):
 
         return x
 
+
 class CustomMel7(nn.Module):
     def __init__(self):
         super(CustomMel7, self).__init__()
@@ -562,6 +562,7 @@ class CustomMel7(nn.Module):
         x = self.fc(x[:, -1, :].reshape(batch, -1))
 
         return x
+
 
 class CustomMel8(nn.Module):
     def __init__(self):
@@ -670,6 +671,7 @@ class CustomMel10(nn.Module):
 
         return x
 
+
 class CustomMel11(nn.Module):
     def __init__(self):
         super(CustomMel11, self).__init__()
@@ -705,6 +707,7 @@ class CustomMel11(nn.Module):
 
         return x
 
+
 class CustomMel12(nn.Module):
     def __init__(self):
         super(CustomMel12, self).__init__()
@@ -739,6 +742,7 @@ class CustomMel12(nn.Module):
         x = self.fc(x[:, -1, :].reshape(batch, -1))
 
         return x
+
 
 class CustomMel13(nn.Module):
     def __init__(self):
@@ -888,7 +892,6 @@ class CustomRaw1(nn.Module):
         x = net_input
         batch, freq, width = x.shape
         x = self.conv1(x)
-        # x = self.conv2(x)
         x = self.pool1(x)
         x = self.drop(x)
         x = torch.transpose(x, 1, 2)
@@ -937,7 +940,6 @@ class CustomRaw2(nn.Module):
         x = net_input
         batch, freq, width = x.shape
         x = self.conv1(x)
-        # x = self.conv2(x)
         x = self.pool1(x)
         x = self.drop(x)
         x = torch.transpose(x, 1, 2)

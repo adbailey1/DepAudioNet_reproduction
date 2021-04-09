@@ -3,7 +3,7 @@ import logging.handlers
 import argparse
 import os
 import time
-from data_loader import organiser, organiser_test
+from data_loader import organiser
 import shutil
 import sys
 import torch
@@ -15,18 +15,17 @@ import socket
 from distutils.dir_util import copy_tree
 import sklearn.metrics as metrics
 from sklearn.metrics import confusion_matrix
-from torch.utils.tensorboard import SummaryWriter
-import torchvision.models as models
 import natsort
 from utilities import model_utilities as mu
-from exp_run.plotter import plot_graph, confusion_mat
-from exp_run import config_dataset, dataset_processing
+from exp_run.plotter import plot_graph
+from exp_run import config_dataset
 import pickle
 from exp_run.models_pytorch import CustomMel7 as CustomMel
-from exp_run.models_pytorch import CustomRaw3 as CustomRaw
+from exp_run.models_pytorch import CustomRaw1 as CustomRaw
 from exp_run import config_1 as config
 learn_rate_factor = 2
 EPS = 1e-12
+
 
 def calculate_accuracy(target, predict, classes_num, f_score_average):
     """
@@ -58,10 +57,8 @@ def calculate_accuracy(target, predict, classes_num, f_score_average):
         if target[n] == predict[n]:
             number_correct_predictions[target[n]] += 1
 
-    con_matrix = confusion_matrix(target, predict)
-    # print(con_matrix)
-    cm = confusion_mat(target, predict)
-    # print(cm)
+    con_matrix = confusion_matrix(target,
+                                  predict)
     tn_fp_fn_tp = con_matrix.ravel()
     if tn_fp_fn_tp.shape != (4,):
         value = int(tn_fp_fn_tp)
@@ -80,7 +77,7 @@ def calculate_accuracy(target, predict, classes_num, f_score_average):
                              out=np.zeros_like(number_correct_predictions),
                              where=total != 0)
         p_r_f = metrics.precision_recall_fscore_support(target,
-                                                          predict)
+                                                        predict)
     elif f_score_average == 'macro':
         # This code fixes the divide by zero error
         accuracy = np.divide(number_correct_predictions,
@@ -88,8 +85,8 @@ def calculate_accuracy(target, predict, classes_num, f_score_average):
                              out=np.zeros_like(number_correct_predictions),
                              where=total != 0)
         p_r_f = metrics.precision_recall_fscore_support(target,
-                                                          predict,
-                                                          average='macro')
+                                                        predict,
+                                                        average='macro')
     elif f_score_average == 'micro':
         # This code fixes the divide by zero error
         accuracy = np.divide(np.sum(number_correct_predictions),
@@ -97,8 +94,8 @@ def calculate_accuracy(target, predict, classes_num, f_score_average):
                              out=np.zeros_like(number_correct_predictions),
                              where=total != 0)
         p_r_f = metrics.precision_recall_fscore_support(target,
-                                                          predict,
-                                                          average='micro')
+                                                        predict,
+                                                        average='micro')
     else:
         raise Exception('Incorrect average!')
 
@@ -108,11 +105,7 @@ def calculate_accuracy(target, predict, classes_num, f_score_average):
         for val in range(len(p_r_f)):
             temp[val][position] = float(p_r_f[val])
 
-        temp1 = (temp[0])
-        temp2 = (temp[1])
-        temp3 = (temp[2])
-        temp4 = (temp[3])
-        p_r_f = (temp1, temp2, temp3, temp4)
+        p_r_f = (temp[0], temp[1], temp[2], temp[3])
 
     return accuracy, p_r_f, tn_fp_fn_tp
 
@@ -122,11 +115,9 @@ def forward(model, generate_dev, data_type):
     Pushes the data to the model and collates the outputs
 
     Inputs:
+        model: The neural network for experimentation
         generate_dev: generator - holds the batches for the validation
-        return_target: Bool - If True, return labels and folders information
-        net_params: dictionary - Holds the model configurations
-        recurrent_out: str - Type of output of RNN layer
-
+        data_type: str - set to 'train', 'dev' or 'test'
 
     Output:
         results_dict: dictionary - Outputs, optional - labels and folders
@@ -177,25 +168,26 @@ def evaluate(model, generator, data_type, class_weights, comp_res, class_num,
     the model and then calculating the resulting loss and accuracy metrics.
 
     Input
+        model: neural network for experimentation
         generator: generator - Created to load validation data to the model
         data_type: str - set to 'dev' or 'test'
-        class_weights: tensor - if class weights are used due to imbalanced
-                       dataset
-        comp_res: dataframe - holds the complete results for training and
-                  validation up to the current epoch
+        class_weights: Dictionary - Key is Folder, Value is weight
+        comp_res: np.array - holds results for each iteration of experiment
         class_num: int - Number of classes in the dataset
         f_score_average: str - Type of F1 Score processing
         averaging: str - Geometric or arithmetic for the outputs from the model
         net_p: dictionary - holds the model configurations
         recurrent_out: str - If RNN used, how to process the output
         epochs: int - The current epoch
+        logger: log for keeping important info
+        gender_balance: bool
 
     Returns:
-        complete_results: dataframe - Updated dataframe of results
+        complete_results: np.array - holds results for each iteration of
+                                     experiment
         per_epoch_pred: numpy.array - collated outputs and labels from the
                         current validation test
     """
-
     # Generate function
     print('Generating data for evaluation')
     start_time_dev = time.time()
@@ -221,14 +213,12 @@ def evaluate(model, generator, data_type, class_weights, comp_res, class_num,
     counter = {}
     for p, fol in enumerate(folders):
         if fol not in collected_output.keys():
-            # collected_output[fol] = [outputs[p][0]]
             if data_type == 'dev':
                 new_targets.append(targets[p])
             output_for_loss[fol] = outputs[p]
             collected_output[fol] = np.round(outputs[p])
             counter[fol] = 1
         else:
-            # collected_output[fol].append(outputs[p][0])
             output_for_loss[fol] = outputs[p]
             collected_output[fol] += np.round(outputs[p])
             counter[fol] += 1
@@ -237,37 +227,31 @@ def evaluate(model, generator, data_type, class_weights, comp_res, class_num,
     new_folders = []
     new_output_for_loss = []
     for co in collected_output:
-        temp = collected_output[co] / counter[co]
-        new_outputs.append(temp)
-        temp = output_for_loss[co] / counter[co]
-        new_output_for_loss.append(temp)
+        tmp = collected_output[co] / counter[co]
+        new_outputs.append(tmp)
+        tmp = output_for_loss[co] / counter[co]
+        new_output_for_loss.append(tmp)
         new_folders.append(co)
 
     outputs = np.array(new_outputs)
-    outputs_for_loss = np.array(new_output_for_loss)
     folders = np.array(new_folders)
     if data_type == 'dev':
         targets = np.array(new_targets)
 
-    calculate_time(start_time_dev, time.time(), 'dev', logger)
+    calculate_time(start_time_dev,
+                   time.time(),
+                   'dev',
+                   logger)
 
     if data_type == 'test':
         return outputs, folders
 
     if data_type == 'dev':
-        #TODO change back
-        # weights = {}
-        # for f in folders:
-        #     weights[f] = 1
-        # if not gender_balance:
-        #     class_weights = torch.Tensor([1, 1])
-        # else:
-        #     class_weights = torch.ones()
-        batch_weights = find_batch_weights(folders, class_weights)
-
-        # class_weights = find_batch_weights(folders, class_weights)
+        batch_weights = find_batch_weights(folders,
+                                           class_weights)
         loss = mu.calculate_loss(torch.Tensor(outputs),
-                                 torch.LongTensor(targets), batch_weights,
+                                 torch.LongTensor(targets),
+                                 batch_weights,
                                  gender_balance)
 
         if gender_balance:
@@ -286,6 +270,13 @@ def logging_info(current_dir, data_type=''):
     """
     Sets up the logger to be used for the current experiment. This is useful
     to capture relevant information during the course of the experiment.
+
+    Inputs:
+        current_dir: str - the location of the current experiment
+        data_type: str - set to 'test' or 'dev' when running the code in test
+                         mode. 'dev' will load existing best epochs and
+                         re-run them on validation set, 'test' will load
+                         existing best epochs and run them on test set.
 
     Output
         main_logger: logger - The created logger
@@ -327,9 +318,6 @@ def create_model():
     """
     Creates the model to be used in the current experimentation
 
-    Input
-        main_logger: logger - Used to capture important information
-
     Output
         model: obj - The model to be used for training during experiment
     """
@@ -348,25 +336,20 @@ def setup(current_dir, model_dir, data_type='', path_to_logger_for_test=None):
     used in the experiment. It also determines whether a previous checkpoint
     has been saved.
 
-    Inputs
-        dataset_dir: str - The location of the dataset
-        feature_experiment: str - The type of features used in this experiment
-        data_mode: str - Set to sub if using some of the training data as
-                   validation data or set to complete if using the complete
-                   training data and no validation
-        audio_mode_is_concat_not_shorten: bool - Set False if the data is
-                                          shortened to the shortest clip in the
-                                          dataset
-        make_dataset_equal: bool - Set True if the dataset should be
-                            subsampled in order to balance it
+    Inputs:
+        current_dir: str - dir for the experiment
+        model_dir: str - location of the current model run-through
+        data_type: str - set to 'test' for different setup processing
+        path_to_logger_for_test: str - path to create a logger for running a
+                                       test
 
     Outputs
         main_logger: logger - The logger to be used to record information
         model: obj - The model to be used for training during the experiment
         checkpoint_run: str - The location of the last saved checkpoint
         checkpoint: bool - True if loading from a saved checkpoint
-        next_fold: bool - If loading from a checkpoint is suspected but the
-                   current fold experiment has been completed
+        next_exp: bool - If loading from a checkpoint is suspected but the
+                         current experiment has been completed set True
     """
     reproducibility(chosen_seed)
     checkpoint_run = None
@@ -396,7 +379,8 @@ def setup(current_dir, model_dir, data_type='', path_to_logger_for_test=None):
                     temp_dirs2 = [d for d in temp_dirs2 if '.pth' in d]
                     if int(temp_dirs2[0].split('_')[1]) == final_iteration:
                         if i == exp_runthrough-1:
-                            print(f"A directory at this location exists: {current_dir}")
+                            print(f"A directory at this location "
+                                  f"exists: {current_dir}")
                             sys.exit()
                         else:
                             next_exp = True
@@ -407,12 +391,14 @@ def setup(current_dir, model_dir, data_type='', path_to_logger_for_test=None):
                     return None, None, None, None, next_exp
             else:
                 print(f"Current directory exists but experiment not finished")
-                print(f"Loading from checkpoint: {int(temp_dirs[0].split('_')[1])}")
+                print(f"Loading from checkpoint: "
+                      f"{int(temp_dirs[0].split('_')[1])}")
                 checkpoint_run = os.path.join(model_dir, temp_dirs[0])
                 checkpoint = True
     elif not os.path.exists(current_dir):
         os.mkdir(current_dir)
-        util.create_directories(current_dir, config.EXP_FOLDERS)
+        util.create_directories(current_dir,
+                                config.EXP_FOLDERS)
         os.mkdir(model_dir)
     elif os.path.exists(current_dir) and not os.path.exists(model_dir):
         os.mkdir(model_dir)
@@ -423,40 +409,15 @@ def setup(current_dir, model_dir, data_type='', path_to_logger_for_test=None):
             shutil.rmtree(path_to_logger_for_test, ignore_errors=False,
                           onerror=None)
         os.mkdir(path_to_logger_for_test)
-        main_logger = logging_info(path_to_logger_for_test, data_type)
+        main_logger = logging_info(path_to_logger_for_test,
+                                   data_type)
     else:
-        main_logger = logging_info(current_dir, data_type)
+        main_logger = logging_info(current_dir,
+                                   data_type)
 
     model = create_model()
 
     return main_logger, model, checkpoint_run, checkpoint, next_exp
-
-
-def log_network_params(model, main_logger):
-    """
-    Logs the network architecture for inspection post experiment
-
-    Input
-        params: dictionary - The network configuration from the config file
-        main_logger: logger - Used to record the network architecture
-    """
-    main_logger.info('List of Network Parameters')
-    conv_count = 1
-    fc_count = 1
-
-    for name, param in model.named_parameters():
-        if param.requires_grad:
-            main_logger.info(f"Name: {name}, \nParam.data: {param.data.shape}")
-    if model.named_children():
-        for child in model.named_children():
-            main_logger.info(child)
-    # for p in params:
-    #     if len(list(p.size())) > 3:
-    #         main_logger.info(f"Conv_{conv_count} : {list(p.size())}")
-    #         conv_count += 1
-    #     elif 1 < len(list(p.size())) < 3:
-    #         main_logger.info(f"FC_{fc_count}: {list(p.size())}")
-    #         fc_count += 1
 
 
 def record_top_results(current_results, scores, epoch):
@@ -523,7 +484,6 @@ def compile_train_val_pred(train_res, val_res, comp_train, comp_val, epoch):
          comp_train: numpy.array - The total recorded results
          comp_val: numpy.array - The total recorded results
          epoch: int - The current epoch used for initialisation
-         net_params: dictionary - Holds the model configurations
 
     Outputs
         comp_train: numpy.array - The updated complete results
@@ -557,20 +517,22 @@ def update_complete_results(complete_results, avg_counter, placeholder,
     Inputs
         complete_results: dataframe - holds the complete results from the
                           experiment so far
-        label: str - set to train or dev
         avg_counter: int - used in train mode to average the recorded results
                      for the current epoch
         placeholder: Essentially the number of epochs (but can be used in
                      iteration mode)
-        best_scores: tuple - Contains the best scores so far and the
-                     respective epochs
-        best_scores2: list - More accurate representation of the best score,
-                      gives epoch for best validation F1-Score
+        best_scores: list - Contains the best scores so far and the
+                     respective epochs, calculated according to weighting of
+                     training and validation scores/losses:
+
+                     train_f/4 - train_loss/10 + dev_f - dev_loss/10
+
+                     with a threshold of 86% if training score is less than
+                     this we do not consider it
 
     Outputs
-        complete_results: dataframe - Updated version of the complete results
-        best_scores: tuple - Updated version of best_scores
-        best_scores2: list - Updated version of best_scores2
+        complete_results: np.array - Updated version of the complete results
+        best_scores: list - Updated version of best_scores
     """
     complete_results[0:11] = complete_results[0:11] / avg_counter
     # Accuracy Mean
@@ -582,8 +544,9 @@ def update_complete_results(complete_results, avg_counter, placeholder,
     print_log_results(placeholder, complete_results[0:15], 'train')
     print_log_results(placeholder, complete_results[15:], 'dev')
 
-    best_scores = record_top_results(complete_results, best_scores,
-                                      placeholder)
+    best_scores = record_top_results(complete_results,
+                                     best_scores,
+                                     placeholder)
 
     return complete_results, best_scores
 
@@ -603,15 +566,16 @@ def prediction_and_accuracy(batch_output, batch_labels, initial_condition,
         initial_condition: Bool - True if this is the first instance to set
                            up the variables for logging accuracy
         num_of_classes: The number of classes in this dataset
-        complete_results: Dataframe of the complete results obtained
+        complete_results: np.array - holds results for each iteration of
+                                     experiment
         loss: The value of the loss from the current epoch
         per_epoch_pred: Combined batch outputs and labels for record keeping
-        config: The config file for the current experiment
         f_score_average: The type of averaging to be used fro the F1-Score (
                          Macro, Micro, or None
 
     Output
-        complete_results: Dataframe of the complete results to the current epoch
+        complete_results: np.array - holds results for each iteration of
+                                     experiment
         per_epoch_pred: Combined results of batch outputs and labels for
                         current epoch
     """
@@ -637,7 +601,8 @@ def prediction_and_accuracy(batch_output, batch_labels, initial_condition,
     if batch_labels.dtype == 'float32':
         batch_labels = batch_labels.astype(np.long)
 
-    acc, fscore, tn_fp_fn_tp = calculate_accuracy(batch_labels, prediction,
+    acc, fscore, tn_fp_fn_tp = calculate_accuracy(batch_labels,
+                                                  prediction,
                                                   num_of_classes,
                                                   f_score_average)
     complete_results[0:2] += acc
@@ -682,7 +647,11 @@ def final_organisation(scores, train_pred, val_pred, df, patience, epoch,
     training and validation and saves/copies files from the current
     experiment into the saved model directory for future analysis. The
     complete results to the current epoch are saved for checkpoints or future
-    analysis
+    analysis.
+
+    Copys the current directory to the current experiment dir but only copies
+    over the current main.py and config.py files in case multiple are present
+    due to multiple experiments being run
 
     Inputs
         scores: list - The best scores from the training and validation results
@@ -693,8 +662,6 @@ def final_organisation(scores, train_pred, val_pred, df, patience, epoch,
         df: pandas.dataframe - The complete results for every epoch
         patience: int - Used to record if early stopping was implemented
         epoch: int - The current epoch
-        scores2: list - More accurate version of scores. Only holds the
-                 best validation F1-Score location
         workspace_files_dir: str - Location of the programme code
     """
     main_logger.info(f"Best epoch at: {scores[-1]}")
@@ -713,7 +680,11 @@ def final_organisation(scores, train_pred, val_pred, df, patience, epoch,
                          f"has not improved for {patience} epochs")
     print(f"System will exit as the validation loss has not "
           "improved for {patience} epochs")
-    util.save_model_outputs(model_dir, df, train_pred, val_pred, scores)
+    util.save_model_outputs(model_dir,
+                            df,
+                            train_pred,
+                            val_pred,
+                            scores)
 
     copy_tree(workspace_files_dir, current_dir+'/daic')
     dirs = os.listdir(workspace_files_dir)
@@ -766,67 +737,6 @@ def reproducibility(chosen_seed):
     random.seed(chosen_seed)
 
 
-def collate_net_outputs(output, output_att=None, net_params='SOFTMAX_1',
-                        learning_procedure='soft_mv',
-                        avg_setting='arithmetic', current_batch_size=20,
-                        iterator=0, num=1):
-    """
-    Processes the output of the model depending on user specified options
-    such as whether hard or soft majority vote is used, and whether geometric
-    or arithmetic averaging are to be used. Also handles the situation where
-    an attention mechanism is used.
-
-    Input
-        output: Raw output from the model of this experiment
-        output_att: Raw output of the attention mechanism for this experiment
-        net_params: Dictionary containing the model configurations
-        learning_procedure: Soft or hard majority vote
-        avg_setting: Geometric or arithmetic averaging setting
-        current_batch_size: The current size of the batched output
-
-    Output
-        output: Processed output
-    """
-    net_last_layer = [k for k in net_params.keys()][-1]
-    if 'ATTENTION_global' in net_params or 'ATTENTION_1' in net_params:
-        if iterator+1 == num:
-            if 'ATTENTION_global' in net_params:
-                soft = torch.nn.Softmax(dim=-1)
-                output_att = soft(output_att)
-                attended = output * output_att
-                output = torch.sum(attended,
-                                   dim=1).reshape(current_batch_size,
-                                                  -1)
-            output = torch.clamp(output, min=0, max=1)
-        else:
-            if cuda:
-                output = output.cpu()
-            return output
-    elif learning_procedure == 'hard_mv':
-        if avg_setting == 'geometric':
-            if net_last_layer == 'SIGMOID_1':
-                output = torch.cat((output, 1 - output),
-                                   dim=1)
-            output = torch.clamp(torch.round(output)+EPS,
-                                 min=0, max=1)
-            output = torch.log(output)
-        else:
-            output = torch.round(output)
-    else:
-        if avg_setting == 'geometric':
-            if net_last_layer == 'SIGMOID_1':
-                output = torch.cat((output, 1 - output),
-                                   dim=1)
-            output = torch.log(output)
-        else:
-            output = output
-
-    if cuda:
-        output = output.cpu()
-
-    return output
-
-
 def get_output_from_model(model, data):
     """
     Pushes the batched data to the user specified neural network and
@@ -838,59 +748,20 @@ def get_output_from_model(model, data):
     the final layer of the network (softmax or sigmoid)
 
     Inputs:
+        model: obj - the neural network for experimentation
         data: Data to be pushed to the model
-        net_type: What model is used?
-        net_params: The model configuration - includes layers and filter data
-        learning_procedure: How is the data processed: random_sample,
-                            chunked_file, or whole_file
-        learning_procedure_decider: Soft majority vote or hard majority vote.
-                                    If single files are used instead of sequence
-                                    data, soft majority vote is used
-        locator: Array of the lengths of the files in the batch
-        label: Set to train or dev depending on the section of experiment
-        recurrent_out: If RNN is used, how is the output processed?
 
     Output
         output: The output of the model from the input batch data
     """
-    current_data = mu.create_tensor_data(data, cuda)
+    current_data = mu.create_tensor_data(data,
+                                         cuda)
 
     output = model(current_data)
     if cuda:
         output = output.cpu()
 
     return output
-
-
-def tensorboard_visual(tb_writer, df, epoch_iter):
-    """
-    Outputs current experiment results to Tensorboard to be visualised
-
-    Inputs:
-        tb_writer: obj - Tensorboard object which collects the information
-        df: pandas.dataframe - Holds complete results of experiment
-        epoch_iter: int - The current epoch of the experiment
-    """
-    col = ['train_mean_acc', 'train_mean_fscore', 'train_loss',
-           'val_mean_acc', 'val_mean_fscore', 'val_loss']
-    t_acc = df[col[0]].tolist()[-1]
-    t_f_score = df[col[1]].tolist()[-1]
-    t_loss = df[col[2]].tolist()[-1]
-    v_acc = df[col[3]].tolist()[-1]
-    v_f_score = df[col[4]].tolist()[-1]
-    v_loss = df[col[5]].tolist()[-1]
-
-    tb_writer.add_scalar('Train_Acc', np.array(t_acc), epoch_iter)
-    tb_writer.add_scalar('Val_Acc', np.array(v_acc), epoch_iter)
-    tb_writer.add_scalar('Train_F-Score', np.array(t_f_score), epoch_iter)
-    tb_writer.add_scalar('Val_F-Score', np.array(v_f_score), epoch_iter)
-    tb_writer.add_scalar('Train_Loss', np.array(t_loss), epoch_iter)
-    tb_writer.add_scalar('Val_Loss', np.array(v_loss), epoch_iter)
-
-    f = plot_graph(epoch_iter, df, final_iteration, model_dir, vis=vis)
-
-    tb_writer.add_figure('predictions vs. actuals', f, epoch_iter)
-    tb_writer.file_writer.flush()
 
 
 def begin_evaluation(mode, epoch, reset, iteration, iteration_epoch):
@@ -925,6 +796,18 @@ def begin_evaluation(mode, epoch, reset, iteration, iteration_epoch):
 
 def calculate_time(start_time, end_time, mode_label, main_logger, placeholder=0,
                    iteration=0):
+    """
+    Stores the time it took for the current experimental iteration and saves
+    it to the log
+
+    Inputs:
+        start_time: value of timer when started
+        end_time: value of timer when stopped
+        mode_label: 'train', 'dev', or 'test'
+        main_logger: log to retain useful information
+        placeholder: used in place of the current epoch
+        iteration: the current training iteration
+    """
     calc_time = end_time - start_time
     if mode_label == 'train':
         print(f"Iteration: {iteration}\nTime taken for {mode_label}:"
@@ -938,6 +821,16 @@ def calculate_time(start_time, end_time, mode_label, main_logger, placeholder=0,
 
 
 def find_batch_weights(folders, weights):
+    """
+    Finds the corresponding weight for the folders in the current batch,
+    if weights are not used as specified by config file, set the weights to '1'
+
+    Inputs:
+        folders: The folders in the current batch
+        weights: Dictionary, Key is Folder, Value is corresponding weight
+    Outputs:
+        batch_weights: Weights w.r.t. folder for the current batch
+    """
     batch_weights = torch.ones(folders.shape[0])
     use_weights = config.EXPERIMENT_DETAILS['CLASS_WEIGHTS'] or \
                   config.EXPERIMENT_DETAILS['USE_GENDER_WEIGHTS']
@@ -950,38 +843,15 @@ def find_batch_weights(folders, weights):
     return batch_weights.reshape(-1, 1)
 
 
-def update_weights(predict, target, folder, weights):
-    predict = predict.data.cpu().numpy()
-    target = target.data.cpu().numpy()
-    change = 1.025
-    clamp_min = 0
-    clamp_max = 2.5
-    for pointer, pred in enumerate(predict):
-        if target[pointer] == 1:
-            diff = (1 - pred[0]) / 10
-            diff = 1+diff
-            if pred < .5:
-                if clamp_min < weights[folder[pointer]] < clamp_max:
-                    weights[folder[pointer]] *= diff
-            else:
-                weights[folder[pointer]] /= diff
-        elif target[pointer] == 0:
-            diff = pred[0] / 10
-            if pred > .5:
-                if clamp_min < weights[folder[pointer]] < clamp_max:
-                    weights[folder[pointer]] *= (1 + diff)
-            else:
-                weights[folder[pointer]] /= (1 + diff)
-
-        # if np.round(pred) != target[pointer]:
-        #     weights[folder[pointer]] *= change
-        # else:
-        #     weights[folder[pointer]] /= change
-
-    return weights
-
-
 def bookeeping():
+    """
+    Loads the best results from all experiment run-throughs and stores them
+    together in on variable
+
+    Outputs:
+        final_results: Array of the best results from all experiment
+        run-throughs
+    """
     files = [os.path.join(current_dir, 'model', str(f), 'best_scores.pickle')
              for f in range(1, exp_runthrough+1)]
     final_results = np.zeros((exp_runthrough, 14))
@@ -992,7 +862,8 @@ def bookeeping():
         if data[0] == 0:
             pass
         else:
-            path = os.path.join(current_model_dir, 'md_'+str(data[-1])+'_epochs.pth')
+            path = os.path.join(current_model_dir,
+                                'md_'+str(data[-1])+'_epochs.pth')
             mod_paths = [os.path.join(current_model_dir, l) for l in os.listdir(
                 current_model_dir) if 'md_' in l]
             del mod_paths[mod_paths.index(path)]
@@ -1014,20 +885,18 @@ def train(model, workspace_files_dir):
 
     Input
         model: obj - The model to be used for experimentation
-        feature_experiment: str - The type of features for this experiment
         workspace_files_dir: str - Location of the programme code
-        convert_to_im: book - Set True if the data is to be converted to 3D
     """
     num_of_classes = len(config_dataset.LABELS)
     learning_rate = config.EXPERIMENT_DETAILS['LEARNING_RATE']
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     main_logger.info(f"Optimiser: ADAM. Learning Rate: {learning_rate}")
     if checkpoint:
-        start_epoch, data_saver = util.load_model(checkpoint_run, model,
+        start_epoch, data_saver = util.load_model(checkpoint_run,
+                                                  model,
                                                   optimizer)
         df, comp_train_pred, comp_val_pred, best_scores = \
             util.load_model_outputs(model_dir)
-        counter = start_epoch
     else:
         start_epoch = 0
         # train_acc, train_fscore, train_loss, val_acc, val_fscore, val_loss
@@ -1040,17 +909,18 @@ def train(model, workspace_files_dir):
     # train_info tuple of number of zeros, ones and class weights and if
     # gender balance is specified, gender weights (also tuple of
     # (fem_nd_w, fem_d_w, male_nd_w, male_d_w)
-    gen, train_info = organiser.run(config, main_logger, checkpoint,
-                                    features_dir, data_saver)
+    gen, train_info = organiser.run_train(config,
+                                          main_logger,
+                                          checkpoint,
+                                          features_dir,
+                                          data_saver)
 
     avg_counter = per_epoch_train_pred = 0
     # Train/Val, Accuracy, Precision, Recall, Fscore, Loss(single), mean_acc/f
     complete_results = np.zeros(30)
 
-    # learn_rate_factor = 2
     gender_balance = config.EXPERIMENT_DETAILS['USE_GENDER_WEIGHTS']
     cw = train_info[-3]
-    # malleable_cw = cw.copy()
     start_new_timer = False
     start_timer = time.time()
     print('Beginning Training')
@@ -1064,25 +934,18 @@ def train(model, workspace_files_dir):
         avg_counter += 1
         model.train()
         batch_labels = torch.LongTensor(batch[1])
-        batch_output = get_output_from_model(model=model, data=batch[0])
+        batch_output = get_output_from_model(model=model,
+                                             data=batch[0])
         batch_folders = batch[2]
         comp.append(batch_folders)
 
-        # batch_weights = torch.Tensor(cw)
-        # train_loss = mu.calculate_loss(batch_output, batch_labels,
-        #                                batch_weights, gender_balance)
-        #TODO Change this
-        # if not config.WEIGHT_TYPE == 'macro' and config.EXPERIMENT_DETAILS[
-        #     'CLASS_WEIGHTS']:
-        #     batch_weights = find_batch_weights(batch_folders, cw)
-        # else:
-        #     batch_weights = cw
-        batch_weights = find_batch_weights(batch_folders, cw)
+        batch_weights = find_batch_weights(batch_folders,
+                                           cw)
 
-        train_loss = mu.calculate_loss(batch_output, batch_labels,
-                                       batch_weights, gender_balance)
-        # malleable_cw = update_weights(batch_output.clone(), batch_labels.clone(),
-        #                               batch_folders, malleable_cw)
+        train_loss = mu.calculate_loss(batch_output,
+                                       batch_labels,
+                                       batch_weights,
+                                       gender_balance)
 
         if gender_balance:
             batch_labels = batch_labels % 2
@@ -1094,59 +957,85 @@ def train(model, workspace_files_dir):
 
         init = initialiser(avg_counter)
         complete_results[0:15], per_epoch_train_pred = \
-            prediction_and_accuracy(batch_output, batch_labels, init,
-                                    num_of_classes, complete_results[0:15],
-                                    train_loss, per_epoch_train_pred)
+            prediction_and_accuracy(batch_output,
+                                    batch_labels,
+                                    init,
+                                    num_of_classes,
+                                    complete_results[0:15],
+                                    train_loss,
+                                    per_epoch_train_pred)
 
-        begin_evaluate = begin_evaluation(analysis_mode, batch[-2], batch[-1],
-                                          iteration, iteration_epoch)
+        begin_evaluate = begin_evaluation(analysis_mode,
+                                          batch[-2],
+                                          batch[-1],
+                                          iteration,
+                                          iteration_epoch)
         if begin_evaluate:
             if analysis_mode == 'epoch':
                 placeholder = batch[-2]
             else:
-                # counter += 1
                 placeholder = iteration_epoch // learn_rate_factor
 
             if validate:
                 start_new_timer = True
-                calculate_time(start_timer, time.time(), 'train', main_logger,
-                               placeholder, iteration)
+                calculate_time(start_timer,
+                               time.time(),
+                               'train',
+                               main_logger,
+                               placeholder,
+                               iteration)
                 print('Evaluating - Development at epoch: ', placeholder)
                 (complete_results[15:], per_epoch_val_pred) = evaluate(
-                    model=model, generator=gen, data_type='dev',
+                    model=model,
+                    generator=gen,
+                    data_type='dev',
                     class_weights=train_info[-1],
                     comp_res=complete_results[15:],
-                    class_num=num_of_classes, f_score_average=None,
-                    epochs=start_epoch, logger=main_logger,
+                    class_num=num_of_classes,
+                    f_score_average=None,
+                    epochs=start_epoch,
+                    logger=main_logger,
                     gender_balance=gender_balance)
 
                 complete_results, best_scores = \
-                    update_complete_results(complete_results, avg_counter,
-                                            placeholder, best_scores)
+                    update_complete_results(complete_results,
+                                            avg_counter,
+                                            placeholder,
+                                            best_scores)
                 avg_counter = 0
                 df.loc[placeholder-1] = complete_results
 
                 complete_results = np.zeros(30)
-                plot_graph(placeholder, df, final_iteration, model_dir,
+                plot_graph(placeholder,
+                           df,
+                           final_iteration,
+                           model_dir,
                            vis=vis)
 
             comp_train_pred, comp_val_pred = compile_train_val_pred(
-                per_epoch_train_pred, per_epoch_val_pred, comp_train_pred,
-                comp_val_pred, placeholder)
+                per_epoch_train_pred,
+                per_epoch_val_pred,
+                comp_train_pred,
+                comp_val_pred,
+                placeholder)
 
             # Reduce learning rate
             if placeholder % learn_rate_factor == 0:
                 reduce_learning_rate(optimizer)
-                # cw = malleable_cw
-                # malleable_cw = cw.copy()
 
             # Save model
             data_saver['class_weights'] = cw
-            util.save_model(placeholder, model, optimizer, main_logger,
-                            model_dir, data_saver)
-            #tensorboard_visual(writers, df, batch[-2])
-            util.save_model_outputs(model_dir, df, comp_train_pred,
-                                    comp_val_pred, best_scores)
+            util.save_model(placeholder,
+                            model,
+                            optimizer,
+                            main_logger,
+                            model_dir,
+                            data_saver)
+            util.save_model_outputs(model_dir,
+                                    df,
+                                    comp_train_pred,
+                                    comp_val_pred,
+                                    best_scores)
 
             # Stop learning
             patience = final_iteration+1
@@ -1156,21 +1045,38 @@ def train(model, workspace_files_dir):
                 if not trial < reference:
                     print(f"Val_loss - Patience {reference}\nVal loss - "
                           f"Current {trial}")
-                    final_organisation(best_scores, comp_train_pred,
-                                       comp_val_pred, df, patience,
-                                       placeholder, workspace_files_dir)
+                    final_organisation(best_scores,
+                                       comp_train_pred,
+                                       comp_val_pred,
+                                       df,
+                                       patience,
+                                       placeholder,
+                                       workspace_files_dir)
 
-                    plot_graph(placeholder, df, final_iteration, model_dir,
-                               early_stopper=True, vis=vis)
+                    plot_graph(placeholder,
+                               df,
+                               final_iteration,
+                               model_dir,
+                               early_stopper=True,
+                               vis=vis)
                     break
             elif placeholder == final_iteration:
-                final_organisation(best_scores, comp_train_pred,
-                                   comp_val_pred, df, patience, placeholder,
+                final_organisation(best_scores,
+                                   comp_train_pred,
+                                   comp_val_pred,
+                                   df,
+                                   patience,
+                                   placeholder,
                                    workspace_files_dir)
                 break
 
 
 def test():
+    """
+    Re-runs experiment details from config file by loading the best
+    perfroming epochs and if data_type='dev' re-run using the validation
+    data, if data_type='test' re-run using the test data
+    """
     if validate:
         tester = False
         data_type = 'dev'
@@ -1183,10 +1089,12 @@ def test():
         comp_scores = np.zeros((exp_runthrough, 20))
     else:
         comp_scores = np.zeros((exp_runthrough, 10))
+
     for exp_num in range(exp_runthrough):
         placeholder = str(exp_num+1)
         model_dir = os.path.join(current_dir,
-                                 'model', folder_extensions[exp_num])
+                                 'model',
+                                 folder_extensions[exp_num])
         if data_type == 'test':
             path_to_logger_for_test = os.path.join(features_dir,
                                                    sub_dir + '_test')
@@ -1194,7 +1102,8 @@ def test():
             path_to_logger_for_test = None
 
         if data_type == 'test' and counter == 0 or data_type == 'dev':
-            main_logger, model, _, _, _ = setup(current_dir, model_dir,
+            main_logger, model, _, _, _ = setup(current_dir,
+                                                model_dir,
                                                 data_type,
                                                 path_to_logger_for_test)
         num_of_classes = len(config_dataset.LABELS)
@@ -1207,31 +1116,39 @@ def test():
                 current_epoch = int(file.split('_')[1])
                 model_dir = os.path.join(model_dir, file)
 
-        # current_epoch = 37
-        # file = 'md_' + str(current_epoch) + '_epochs.pth'
-        # model_dir = os.path.join(model_dir, file)
-
         _, data_saver = util.load_model(checkpoint_path=model_dir,
-                                        model=model, optimizer=optimizer)
+                                        model=model,
+                                        optimizer=optimizer)
 
         if data_type == 'test' and counter == 0 or data_type == 'dev':
             if config.EXPERIMENT_DETAILS['SPLIT_BY_GENDER']:
-                generators, cw = organiser_test.run(config, main_logger,
-                                                    False, features_dir,
-                                                    data_saver, tester)
+                generators, cw = organiser.run_test(config,
+                                                    main_logger,
+                                                    False,
+                                                    features_dir,
+                                                    data_saver,
+                                                    tester)
             else:
-                generator, cw = organiser_test.run(config, main_logger, False,
-                                                   features_dir, data_saver,
+                generator, cw = organiser.run_test(config,
+                                                   main_logger,
+                                                   False,
+                                                   features_dir,
+                                                   data_saver,
                                                    tester)
         f_score = None
         if data_type == 'dev':
             if config.EXPERIMENT_DETAILS['SPLIT_BY_GENDER']:
                 start = 0
                 for gen in generators:
-                    scores, per_epoch = evaluate(model, gen, data_type,
-                                                 cw[-1], np.zeros(30),
-                                                 num_of_classes, f_score,
-                                                 current_epoch, main_logger,
+                    scores, per_epoch = evaluate(model,
+                                                 gen,
+                                                 data_type,
+                                                 cw[-3],
+                                                 np.zeros(30),
+                                                 num_of_classes,
+                                                 f_score,
+                                                 current_epoch,
+                                                 main_logger,
                                                  gender_balance)
 
                     scores[8] = np.mean(scores[0:2])
@@ -1239,15 +1156,20 @@ def test():
                     scores = [scores[8], scores[0], scores[1], scores[9],
                               scores[6], scores[7], scores[11], scores[12],
                               scores[13], scores[14]]
-                    print(scores)
-                    comp_scores[exp_num, start:start+10] = scores
+                    print("Scores: ", scores)
+                    comp_scores[exp_num, start:start + 10] = scores
                     start += 10
                     main_logger.info(f"Scores are: \n{scores}")
             else:
-                scores, per_epoch = evaluate(model, generator, data_type,
-                                             cw[-1], np.zeros(30),
-                                             num_of_classes, f_score,
-                                             current_epoch, main_logger,
+                scores, per_epoch = evaluate(model,
+                                             generator,
+                                             data_type,
+                                             cw[-3],
+                                             np.zeros(30),
+                                             num_of_classes,
+                                             f_score,
+                                             current_epoch,
+                                             main_logger,
                                              gender_balance)
 
                 scores[8] = np.mean(scores[0:2])
@@ -1255,16 +1177,23 @@ def test():
                 scores = [scores[8], scores[0], scores[1], scores[9],
                           scores[6], scores[7], scores[11], scores[12],
                           scores[13], scores[14]]
-                print(scores)
+                print("Scores: ", scores)
                 comp_scores[exp_num, :] = scores
                 main_logger.info(f"Scores are: \n{scores}")
         else:
-            pred, folders = evaluate(model, generator, data_type, cw[-1],
-                                     np.zeros(30), num_of_classes,
-                                     f_score, current_epoch, main_logger)
+            pred, folders = evaluate(model,
+                                     generator,
+                                     data_type,
+                                     cw[-3],
+                                     np.zeros(30),
+                                     num_of_classes,
+                                     f_score,
+                                     current_epoch,
+                                     main_logger)
             pred = np.round(pred).astype(int)
             if counter == 0:
-                df = pd.DataFrame(data=pred, index=list(folders),
+                df = pd.DataFrame(data=pred,
+                                  index=list(folders),
                                   columns=[placeholder])
                 counter += 1
             else:
@@ -1279,9 +1208,9 @@ def test():
 
     # tn_fp_fn_tp
     print('Average:')
-    comp_scores2 = np.sum(comp_scores, axis=0)
-    print(comp_scores2)
-    main_logger.info(f"Average Scores: \n{comp_scores2}")
+    comp_scores_avg = np.mean(comp_scores, axis=0)
+    print(comp_scores_avg)
+    main_logger.info(f"Average Scores: \n{comp_scores_avg}")
     if data_type == 'dev' and config.EXPERIMENT_DETAILS['SPLIT_BY_GENDER']:
         tp1 = np.sum(comp_scores[:, 9])
         fn1 = np.sum(comp_scores[:, 8])
@@ -1292,28 +1221,16 @@ def test():
         fp2 = np.sum(comp_scores[:, -3])
         tn2 = np.sum(comp_scores[:, -4])
         matrix1 = np.array([['', ' ', '    Prediction', ''],
-                            ['-', '-', '       D', '   ND '],
-                            ['Ground', 'D ', tp1, fn1],
-                            ['Truth', 'ND ', fp1, tn1]])
+                            ['-', '-', '      ND', '    D '],
+                            ['Ground', 'ND', tn1, fp1],
+                            ['Truth', ' D ', fn1, tp1]])
         matrix2 = np.array([['', ' ', '    Prediction', ''],
-                            ['-', '-', '       D', '   ND '],
-                            ['Ground', 'D ', tp2, fn2],
-                            ['Truth', 'ND ', fp2, tn2]])
+                            ['-', '-', '      ND', '    D '],
+                            ['Ground', 'ND', tn2, fp2],
+                            ['Truth', ' D ', fn2, tp2]])
         print('Female Not Normalised:')
         print(matrix1)
         print('Male Not Normalised:')
-        print(matrix2)
-        matrix1 = np.array([['', ' ', '    Prediction', ''],
-                            ['-', '-', '       D', '   ND '],
-                            ['Ground', 'D ', tp1/(tp1+fn1), fn1/(tp1+fn1)],
-                            ['Truth', 'ND ', fp1/(fp1+tn1), tn1/(fp1+tn1)]])
-        matrix2 = np.array([['', ' ', '    Prediction', ''],
-                            ['-', '-', '       D', '   ND '],
-                            ['Ground', 'D ', tp2/(tp2+fn2), fn2/(tp2+fn2)],
-                            ['Truth', 'ND ', fp2/(fp2+tn2), tn2/(fp2+tn2)]])
-        print('Female Normalised:')
-        print(matrix1)
-        print('Male Normalised:')
         print(matrix2)
         main_logger.info(f"Female and Male Confusion Matrices")
         main_logger.info(matrix1)
@@ -1325,45 +1242,63 @@ if __name__ == '__main__':
     sub_parser = parser.add_subparsers(dest='mode')
 
     parser_train = sub_parser.add_parser('train')
-    parser_train.add_argument('--validate', action='store_true', default=False,
-                              help='set whether we want to use a validation set')
-    parser_train.add_argument('--vis', action='store_true', default=False,
+    parser_train.add_argument('--validate',
+                              action='store_true',
+                              default=False,
+                              help='set whether we want to use a validation '
+                                   'set')
+    parser_train.add_argument('--vis',
+                              action='store_true',
+                              default=False,
                               help='determine whether model graph is output')
-    parser_train.add_argument('--cuda', action='store_true', default=False,
+    parser_train.add_argument('--cuda',
+                              action='store_true',
+                              default=False,
                               help='pass --cuda if you want to run on GPU')
-    parser_train.add_argument('--debug', action='store_true', default=False,
+    parser_train.add_argument('--debug',
+                              action='store_true',
+                              default=False,
                               help='set the program to run in debug mode '
                                    'means, that the most recent folder will '
                                    'be deleted automatically to speed up '
                                    'debugging')
-    parser_train.add_argument('--position', type=int, default=1, help='Used '
-                                                                      'to determine '
-                                                           'which main and '
-                                                           'config files to save')
-    parser_train.add_argument('--limited_memory', action='store_true',
-                              default=False, help='Set to true if working '
-                                                  'with less than 32GB RAM')
+    parser_train.add_argument('--position',
+                              type=int,
+                              default=1,
+                              help='Used to determine which main and config '
+                                   'files to save')
+    parser_train.add_argument('--limited_memory',
+                              action='store_true',
+                              default=False,
+                              help='Set to true if working with less than '
+                                   '32GB RAM')
 
     parser_test = sub_parser.add_parser('test')
-    parser_test.add_argument('--vis', action='store_true', default=False,
+    parser_test.add_argument('--vis',
+                             action='store_true',
+                             default=False,
                              help='determine whether model graph is output')
-    parser_test.add_argument('--cuda', action='store_true', default=False,
+    parser_test.add_argument('--cuda',
+                             action='store_true',
+                             default=False,
                              help='pass --cuda if you want to run on GPU')
-    parser_test.add_argument('--validate', action='store_true',
-                             default=False, help='Do you want to run the '
-                                                 'respective validation folds '
-                                                 'used during training in '
-                                                 'testing?')
-    parser_test.add_argument('--position', type=int, default=1, help='Used '
-                                                                      'to determine '
-                                                           'which main and '
-                                                           'config files to save')
-    parser_test.add_argument('--debug', action='store_true', default=False,
+    parser_test.add_argument('--validate',
+                             action='store_true',
+                             default=False,
+                             help='Do you want to run the respective '
+                                  'validation folds used during training in '
+                                  'testing?')
+    parser_test.add_argument('--position',
+                             type=int,
+                             default=1,
+                             help='Used to determine which main and config '
+                                  'files to save')
+    parser_test.add_argument('--debug',
+                             action='store_true',
+                             default=False,
                              help='set the program to run in debug mode '
-                                   'means, that the most recent folder will '
-                                   'be deleted automatically to speed up '
-                                   'debugging')
-
+                                  'means, that the most recent folder will be '
+                                  'deleted automatically to speed up debugging')
     args = parser.parse_args()
 
     mode = args.mode
@@ -1398,11 +1333,13 @@ if __name__ == '__main__':
         for i in range(exp_runthrough):
             model_dir = os.path.join(current_dir, 'model', folder_extensions[i])
             main_logger, model, checkpoint_run, checkpoint, next_exp = setup(
-                current_dir, model_dir)
+                current_dir,
+                model_dir)
             if next_exp:
                 break
             comp_start_time = time.time()
-            train(model, config.WORKSPACE_FILES_DIR)
+            train(model,
+                  config.WORKSPACE_FILES_DIR)
             if i+1 == exp_runthrough:
                 total_score = bookeeping()
                 mean_score = np.mean(total_score, axis=0)
@@ -1412,8 +1349,7 @@ if __name__ == '__main__':
                 print(list(mean_score))
             comp_end_time = time.time()
             complete_time = comp_end_time - comp_start_time
-            main_logger.info(f"Complete time to run model:"
-                             f" {complete_time}")
+            main_logger.info(f"Complete time to run model: {complete_time}")
             handlers = main_logger.handlers[:]
             for handler in handlers:
                 handler.close()

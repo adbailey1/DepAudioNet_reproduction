@@ -81,6 +81,9 @@ def plot_graph(epoch, results, total_epochs, model_dir, early_stopper=False,
         early_stopper: bool - If True, saves the plot even if total_epochs
                        has not been reached
         vis: bool - Set True if plot is to be visible after every epoch
+
+    Outputs:
+        fig: matplot of the current progress graph
     """
     x_values = list(range(1, epoch+1))
 

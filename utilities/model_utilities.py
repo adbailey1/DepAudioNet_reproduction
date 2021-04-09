@@ -2,14 +2,13 @@ import torch
 import torch.nn as nn
 
 
-def create_tensor_data(x, cuda, labels=False):
+def create_tensor_data(x, cuda):
     """
     Converts the data from numpy arrays to torch tensors
 
     Inputs
         x: The input data
         cuda: Bool - Set to true if using the GPU
-        select_net: Slightly different processing if using multi-gpu option
 
     Output
         x: Data converted to a tensor
@@ -21,7 +20,7 @@ def create_tensor_data(x, cuda, labels=False):
     else:
         raise Exception("Error!")
 
-    if not labels and cuda:
+    if cuda:
         x = x.cuda()
 
     return x
@@ -35,24 +34,12 @@ def calculate_loss(prediction, target, cw=None, gender=True):
     Inputs
         prediction: The output of the model
         target: The relative label for the output of the model
-        averaging_setting: Geometric or arithmetic
-        cw: The class weights for the dataset
-        sigmoid_processing: round or unnorm. Round treats .5 as the threshold
-                            whereas unnorm is the unnormalised probability.
-                            In this case, everything is relative to class 0.
-                            E.g. output of 0.8 and label=0 is 80% probability
-                            of class 0, whereas 0.8 and label=1 is 20%
-                            probability of class 1
-        net_params: Dictionary containing the model configuration
+        cw: torch.Tensor - The class weights for the dataset
+        gender: bool set True if splitting data according to gender
 
     Output
         loss: The BCELoss or NLL_Loss
     """
-    # batch_zeros_f, batch_ones_f, batch_zeros_m, batch_ones_m
-    # cw = f_ndep_ind, f_dep_ind, m_ndep_ind, m_dep_ind
-    # OR
-    # cw = nd, d
-
     if gender:
         if target.shape[0] != cw.shape[0]:
             fem_nd_w, fem_d_w, male_nd_w, male_d_w = cw
@@ -82,6 +69,7 @@ def calculate_loss(prediction, target, cw=None, gender=True):
 
     if prediction.dim() == 1:
         prediction = prediction.view(-1, 1)
+
     bceloss = nn.BCELoss(weight=cw)
     loss = bceloss(prediction, target.float().view(-1, 1))
 

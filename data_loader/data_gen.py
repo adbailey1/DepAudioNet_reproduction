@@ -21,12 +21,38 @@ class GenerateData:
             dev_feat: Array of validation features
             train_loc: Location list of the length of all the files
             dev_loc: Location list of the length of all the files
-            train_indexes: Indexes for the training data
-            dev_indexes: Indexes for the validation data
+            train_indices: Indices for the training data
+            dev_indices: Indices for the validation data
             logger: Logger to record important information
             config: config file holding state information
             checkpoint: Bool - If true, load initial conditions from last
                         checkpoint
+            gender_balance: Bool are we balancing files in the dataset
+                            according to gender?
+            data_saver: Dictionary holding info such as the 'mean' and 'std'
+                        - used for checkpointing
+
+            When gender balancing:
+            self.data_saver = {'pointer_one_f': pointer_one_f,
+                               'pointer_zero_f': pointer_zero_f,
+                               'pointer_one_m': pointer_one_m,
+                               'pointer_zero_m': pointer_zero_m,
+                               'index_ones_f': train_indices_ones_f,
+                               'index_zeros_f': train_indices_zeros_f,
+                               'index_ones_m': train_indices_ones_m,
+                               'index_zeros_m': train_indices_zeros_m,
+                               'temp_batch': temp_batch,
+                               'total_num_dep': total_num_dep,
+                               'mean': self.mean,
+                               'std': self.standard_deviation}
+            When not gender balancing:
+            self.data_saver = {'pointer_one': pointer_one,
+                               'pointer_zero': pointer_zero,
+                               'index_ones': train_indices_ones,
+                               'index_zeros': train_indices_zeros,
+                               'temp_batch': temp_batch,
+                               'mean': self.mean,
+                               'std': self.standard_deviation}
         """
         self.gender_balance = gender_balance
         if self.gender_balance:
@@ -410,7 +436,6 @@ class GenerateData:
         elif not self.checkpoint:
             random.shuffle(indices)
 
-        # while pointer < self.dev_feat.shape[0]:
         while pointer < len(indices):
             batch_indices = indices[pointer:pointer+self.batch_size]
             batch_data = self.dev_feat[batch_indices]
@@ -432,9 +457,6 @@ class GenerateData:
         generator is created which will be used to obtain the batch data and
         important information is also saved in order to load the experiment
         from a check point.
-
-        Inputs
-            epoch: The current epoch used to start validation from a checkpoint
 
         Output
             batch_data: Current batched data for training
@@ -472,7 +494,6 @@ class GenerateData:
                     batch_data = np.zeros((max_value*current_batch_size,
                                            self.freq_bins,
                                            self.feature_dim))
-                # batch_data = batch_data - 1e-5
                 for p, j in enumerate(locs):
                     interim_data = self.dev_feat[j[0]:j[1]]
                     placeholder = p

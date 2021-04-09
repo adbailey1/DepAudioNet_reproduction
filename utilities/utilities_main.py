@@ -68,7 +68,7 @@ def load_model(checkpoint_path, model, optimizer):
 
     """
     checkpoint = torch.load(checkpoint_path)
-    model.load_state_dict(checkpoint['state_dict'])
+    model.load_state_dict(checkpoint['state_dict'], strict=False)
     optimizer.load_state_dict(checkpoint['optimizer'])
     epoch = checkpoint['epoch']
     torch.set_rng_state(checkpoint['rng_state'])
@@ -100,8 +100,6 @@ def save_model_outputs(model_dir, dataframe, train_pred, val_pred,
         val_pred: Outputs of the validation batches at each epoch up to the
                   checkpoint
         best_scores: Record of the best performing iteration of the model
-        best_scores_2: Same as best_scores but more accurate and only
-                       holds validation position
     """
     save_path = os.path.join(model_dir, 'complete_results.pickle')
     dataframe.to_pickle(save_path)
@@ -231,11 +229,13 @@ def count_classes(complete_classes):
         complete_classes: List of the classes of the dataset
 
     Outputs:
-        zeros: Dictionary folder: list(indexes)
-        index_zeros: Indexes of the zeros in the dataset w.r.t. feature array
-        ones: Dictionary folder: list(indexes)
-        index_ones: Indexes of the ones in the dataset w.r.t. feature array
-        indexes_comp: Dictionary indexes: folder for every segment in dataset
+        zeros: Dictionary Key is folder, Value is list(indices)
+        index_zeros: List of indices of the zeros in the dataset w.r.t. feature
+                     array
+        ones: Dictionary Key is folder, Value is list(indices)
+        index_ones: List of indexes of the ones in the dataset w.r.t. feature
+                    array
+        indexes_comp: Dictionary Key is index, Value is folder
     """
     index_zeros = []
     index_ones = []
@@ -268,11 +268,21 @@ def count_classes_gender(complete_classes):
         complete_classes: List of the classes of the dataset
 
     Outputs:
-        zeros: Dictionary folder: list(indexes)
-        index_zeros: Indexes of the zeros in the dataset w.r.t. feature array
-        ones: Dictionary folder: list(indexes)
-        index_ones: Indexes of the ones in the dataset w.r.t. feature array
-        indexes_comp: Dictionary indexes: folder for every segment in dataset
+        zeros_f: Dictionary of female non_dep, Key is folder, Value is list(
+                 indices)
+        zeros_m: Dictionary of male non_dep, Key is folder, Value is list(
+                 indices)
+        index_zeros_f: List of indices of the female non-dep in the dataset
+                       w.r.t. feature array
+        index_zeros_m: List of indices of the male non-dep in the dataset w.r.t.
+                       feature array
+        ones_f: Dictionary of male dep, Key is folder, Value is list(indices)
+        ones_m: Dictionary of male dep, Key is folder, Value is list(indices)
+        index_ones_f: List of indices of the male dep in the dataset w.r.t.
+                      feature array
+        index_ones_m: List of indices of the male dep in the dataset w.r.t.
+                      feature array
+        indexes_comp: Dictionary Key is index, Value is folder
     """
     index_zeros_f = []
     index_zeros_m = []
@@ -312,43 +322,43 @@ def count_classes_gender(complete_classes):
                 else:
                     ones_m[folder].append(i)
 
-    return [zeros_f, zeros_m], [index_zeros_f, index_zeros_m], [ones_f,
-            ones_m], [index_ones_f, index_ones_m], indices_comp
+    return [zeros_f, zeros_m], [index_zeros_f, index_zeros_m], \
+           [ones_f, ones_m], [index_ones_f, index_ones_m], indices_comp
 
 
-
-def count_class(complete_classes, indexes, new_indexes, comp_index):
+def count_class(complete_classes, indices, new_indices, comp_index):
     """
     Counts the number of zeros and ones in the dataset:
 
     Input:
         complete_classes: List of the classes of the dataset
+        indices:
+        new_indices:
+        comp_index:
 
     Outputs:
-        zeros: Number of zeros in the dataset
-        index_zeros: Indexes of the zeros in the dataset w.r.t. feature array
-        ones: Number of ones in the dataset
-        index_ones: Indexes of the ones in the dataset w.r.t. feature array
+        dict_folder_instances:
+        new_indices:
     """
-    dictionary = {}
-    updated_indexes = {}
-    for i, index in enumerate(indexes):
+    dict_folder_instances = {}
+    updated_indices = {}
+    for i, index in enumerate(indices):
         folder = complete_classes[0][index]
-        updated_indexes[index] = folder
-        if folder not in dictionary:
-            dictionary[folder] = 1
+        updated_indices[index] = folder
+        if folder not in dict_folder_instances:
+            dict_folder_instances[folder] = 1
         else:
-            dictionary[folder] += 1
+            dict_folder_instances[folder] += 1
 
     to_remove = []
-    for i in indexes:
-        if i not in new_indexes:
+    for i in indices:
+        if i not in new_indices:
             to_remove.append(i)
 
     for i in to_remove:
         del comp_index[i]
 
-    return dictionary, new_indexes
+    return dict_folder_instances, new_indices
 
 
 def load_data(path, labels):
@@ -387,8 +397,7 @@ def load_labels(path):
                 if i == 0:
                     labels = pickle.load(f)
                 else:
-                    labels = np.concatenate((labels,
-                                             pickle.load(f)),
+                    labels = np.concatenate((labels, pickle.load(f)),
                                             axis=1)
     else:
         with open(path, 'rb') as f:

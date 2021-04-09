@@ -164,9 +164,7 @@ def feature_segmenter(feature, meta, feature_exp, dim, convert_to_image=False):
 
     Inputs:
         feature: The feature array to be segmented
-        folder: Folder related to the feature
-        clss: Class related to the feature
-        score: Score related to the feature
+        meta: Includes Folder, Class, Score, and Gender
         feature_exp: Type of feature experiment eg. logmel
         dim: Value to segment the data by
         convert_to_image: Bool - Is the feature array being converted to 3D?
@@ -196,10 +194,11 @@ def feature_segmenter(feature, meta, feature_exp, dim, convert_to_image=False):
         new_features = np.zeros([num_extra_dimensions, feature.shape[0], dim],
                                 dtype=np.float32)
 
-    # Goes through all features and takes segments of 512 samples to
-    # make  a new variable with dimensions of (x, 128, 512) instead of
-    # (142, 128, 8236) 512 doesn't exactly fit into 8236/512 therefore
-    # the last section will be zero padded. No overlap has been
+    # E.g. if mel bins = 128 and segments = 512, and original length of
+    # data = 8236, goes through all features and takes segments of 512
+    # samples to make a new variable with dimensions of (x, 128,
+    # 512) instead of (x, 128, 8236) 512 doesn't exactly fit into 8236/512
+    # therefore the last section will be zero padded. No overlap has been
     # considered so far.
     last_dim = feature.shape[-1]
     leftover = dim - (last_dim % dim)

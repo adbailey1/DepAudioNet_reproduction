@@ -1,8 +1,6 @@
 **Prerequisites**
 
-This was created using Python 3.7, future versions of Python may not be compatible with the packages in the environment files. 
-
-Install miniconda and load the environment file from environment_conda.yml file
+Install miniconda and load the environment file from environment.yml file
 
 `conda env create -f environment.yml`
 
@@ -12,43 +10,48 @@ Activate the new environment: `conda activate myenv`
 
 **Dataset**
 
-For this experiment, the DAIC-WOZ dataset is used. This can be obtained
+For this experiment, the DAIC-WOZ dataset is used (found in AVEC16 - AVEC17, 
+not the newer extended version). This can be 
+obtained
  through The University of Southern California (http://dcapswoz.ict.usc.edu
  /) by signing an agreement form. The dataset is roughly 135GB. 
  
  The dataset contains many errors and noise (such as interruptions during an
   interview or missing transcript files for the virtual agent). It is
    recommended to download and run my DAIC-WOZ Pre-Processing Framework in
-    order to quickly begin experimenting with this data (LINK)
+    order to quickly begin experimenting with this data (https://github.com/adbailey1/daic_woz_process)
 
 **Experiment Setup**
 
 Use the config file to set experiment preferences and locations of the code, workspace, and dataset directories. There are two config files here. config.py is usually used as a template and further config files are added with the suffix '_1', '_2' etc for different experiments. 
 
 Updated the run.sh file if you want to run the experiment through bash (call
- ./run.sh from terminal). The arguments required by calling main1.py
+ `./run.sh` from terminal). The arguments required by calling main.py
   are: 
- - train - to train a model 
-- test - to test a trained model
+ - `train` - to train a model 
+- `test` - to test a trained model
 
 Optional commands are: 
-- --validate - to train a model with a validation set
-- --cuda - to train a model using a GPU
-- --vis - to visualise the learning graph at the end of every epoch
-- --debug - for debug mode which automatically overwrites an previous data at
-  a directory for quicker debugging. 
+- `--validate` - to train a model with a validation set
+- `--cuda` - to train a model using a GPU
+- `--vis` - to visualise the learning graph at the end of every epoch
+- `--position` - to specify which main.py and config.py file are used for this 
+  experiment  
+- `--debug` - for debug mode which automatically overwrites an previous data at
+  a directory for quicker debugging.
 
 For example: To run a training experiment without bash, using a validation
- set, GPU, and not visualising the per epoch results graphs
+ set, GPU, not visualising the per epoch results graphs, and using main1.py 
+and config_1.py files:
  
- `python3 main1.py train --validate --cuda --server`
- 
+ `python3 main.py train --validate --cuda --vis --position=1`
+
 **Results Mel-Spectrogram**
 
 All results are found in our paper: https://arxiv.org/abs/2010.15120
 
 We replicated DepAduioNet's reported results by using the following config settings:
-```
+````
 EXPERIMENT_DETAILS = {'FEATURE_EXP': 'mel',
                       'CLASS_WEIGHTS': False,
                       'USE_GENDER_WEIGHTS': False,
@@ -73,33 +76,35 @@ EXPERIMENT_DETAILS = {'FEATURE_EXP': 'mel',
 MIN_CROP = True
 # Determine whether the experiment is run in terms of 'epoch' or 'iteration'
 ANALYSIS_MODE = 'epoch'
-```
+````
 
 NOTE: The mel-spectrogram needs to be computed following Ma et al. {DepAudioNet: An Efficient Deep Model for Audio based Depression Classification (https://dl.acm.org/doi/10.1145/2988257.2988267)} procedure: calculated mel spectrogram per file and calculate: (file - mean) / standard deviation. Check out https://github.com/adbailey1/daic_woz_process for a pre-processing framework that should handle the feature database creation.
 
-Change in main1.py:
-- Use "CustomMel7" for training.
-`from exp_run.models_pytorch import CustomMel7 as CustomMel`
-- Use Learning rate Update = 2
-`learn_rate_factor = 2`
+Import/Global values in main1.py:
 
-Results on Dataset's Validation Set:  Learning Rate update=2
-```
+- Use: `from exp_run.models_pytorch import CustomMel7 as CustomMel`
+- Use: `learn_rate_factor = 2`
+
+Results on Dataset's Validation Set: 
+
+````
 |F1(ND)|F1(D) |F1 avg|
 | .725 | .520 | .622 |
-```
+````
 
-Results on Dataset's Validation Set:  Learning Rate update=3
-```
+- Use: `learn_rate_factor = 3`
+
+Results on Dataset's Validation Set: 
+
+````
 |F1(ND)|F1(D) |F1 avg|
 | .750 | .511 | .631 | 
-```
+````
 
+**Raw Audio Results**
+In config1.py:
 
-**Results Raw Audio**
-
-We replicated DepAduioNet's reported results by using the following config settings:
-```
+````
 EXPERIMENT_DETAILS = {'FEATURE_EXP': 'raw',
                       'CLASS_WEIGHTS': False,
                       'USE_GENDER_WEIGHTS': False,
@@ -124,30 +129,34 @@ EXPERIMENT_DETAILS = {'FEATURE_EXP': 'raw',
 MIN_CROP = True
 # Determine whether the experiment is run in terms of 'epoch' or 'iteration'
 ANALYSIS_MODE = 'epoch'
-```
+````
 
 NOTE: The raw audio needs to be computed in the same way as the mel spectrogram according to: (file - mean) / standard deviation. Check out https://github.com/adbailey1/daic_woz_process for a pre-processing framework that should handle the feature database creation.
 
-Change in main1.py:
-- Use "CustomRaw3" for training.
-`from exp_run.models_pytorch import CustomRaw3 as CustomRaw`
-- Use Learning rate Update = 2
-`learn_rate_factor = 2`
+Import/Global values in main1.py:
 
-Results on Dataset's Validation Set:  Learning Rate update=2 
-```
+- Use: `from exp_run.models_pytorch import CustomRaw3 as CustomRaw`
+- Use: `learn_rate_factor = 2`
+
+Results on Dataset's Validation Set: 
+
+````
 |F1(ND)|F1(D) |F1 avg|
 | .738 | .510 | .624 |
-```
+````
 
-Results on Dataset's Validation Set:  Learning Rate update=3
-```
+- Use: `learn_rate_factor = 3`
+
+Results on Dataset's Validation Set:
+
+````
 |F1(ND)|F1(D) |F1 avg|
 | .765 | .568 | .667 | 
-```
+````
 
 **Notes**
 
-So far the audio and textual data have been experimented with with the
- ability to process the visual data to be conducted in the future.  
+So far the audio data have been experimented with. The
+ ability to process the textual and/or visual data to be conducted in the 
+future.  
 
