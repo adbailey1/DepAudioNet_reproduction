@@ -796,7 +796,7 @@ def organise_data(config, logger, labels, database, mode_label='train'):
 
     Outputs:
         features: Updated array of features
-        labels: Updated lists containing the folders, classes, scores,
+        labels: Updated lists containing the folders, classes, scores, gender,
                        and indices after segmentation
         index: list of the indices of all the ndep and dep files
         loc: List of the start-end length of every segmented data
@@ -947,6 +947,7 @@ def run_train(config, logger, checkpoint, features_dir, data_saver):
         else:
             train_indices[h[0][0]] = p
 
+    # format: [folder, class, score, gender, index]
     train_labels = np.concatenate((train_labels, train_indices.reshape(1, -1)))
     dev_labels = np.concatenate((dev_labels, dev_indices.reshape(1, -1)))
 
