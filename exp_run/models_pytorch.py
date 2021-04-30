@@ -260,7 +260,10 @@ class FullyConnected(nn.Module):
                 else:
                     x = self.fc(x)
             else:
-                x = self.act(self.fc(x))
+                if self.act:
+                    x = self.act(self.fc(x))
+                else:
+                    x = self.fc(x)        
 
         return x
 
