@@ -1,5 +1,7 @@
 **Prerequisites**
 
+This was develpoed for Ubuntu (18.04) with Python 3
+
 Install miniconda and load the environment file from environment.yml file
 
 `conda env create -f environment.yml`
