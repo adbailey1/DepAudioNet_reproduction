@@ -739,13 +739,8 @@ def reproducibility(chosen_seed):
 
 def get_output_from_model(model, data):
     """
-    Pushes the batched data to the user specified neural network and
-    depending on the settings the output will be processed regarding
-    how long the files are in the batch. The high level options are
-    random_sample, chunked_file, and whole_file. The output processing
-    depends also on whether soft majority vote or hard majority vote are
-    selected along with the type of averaging (arithmetic and geometric) and
-    the final layer of the network (softmax or sigmoid)
+    Pushes the batched data to the user specified neural network. The output
+    is pushed back to the CPU if GPU is being used for training.
 
     Inputs:
         model: obj - the neural network for experimentation
