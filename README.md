@@ -47,6 +47,18 @@ For example: To run a training experiment without bash, using a validation
 and config_1.py files:
  
  `python3 main.py train --validate --cuda --vis --position=1`
+ 
+ Without using the validation set:
+ 
+ `python3 main.py train --cuda --vis --position=1`
+ 
+ Running trained models again on the validation set:
+ 
+ `python3 main.py test --validate --cuda --vis --position=1`
+ 
+ Running trained models on the test set:
+ 
+ `python3 main.py test --cuda --vis --position=1`
 
 **Results Mel-Spectrogram**
 
