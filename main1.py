@@ -124,16 +124,13 @@ def forward(model, generate_dev, data_type):
     """
     outputs = []
     folders = []
-    if data_type == 'dev':
-        targets = []
+    targets = []
 
     # Evaluate on mini-batch
     counter = 0
     for data in generate_dev:
-        if data_type == 'dev':
-            (batch_data, batch_label, batch_folder, batch_locator) = data
-        else:
-            (batch_data, batch_folder, batch_locator) = data
+        (batch_data, batch_label, batch_folder, batch_locator) = data
+
         # Predict
         model.eval()
 
@@ -145,8 +142,7 @@ def forward(model, generate_dev, data_type):
         # Append data
         outputs.append(batch_output.data.cpu().numpy())
         folders.append(batch_folder)
-        if data_type == 'dev':
-            targets.append(batch_label)
+        targets.append(batch_label)
 
     results_dict = {}
 
@@ -154,9 +150,8 @@ def forward(model, generate_dev, data_type):
     results_dict['output'] = outputs
     folders = np.concatenate(folders, axis=0)
     results_dict['folder'] = np.array(folders)
-    if data_type == 'dev':
-        targets = np.concatenate(targets, axis=0)
-        results_dict['target'] = np.array(targets)
+    targets = np.concatenate(targets, axis=0)
+    results_dict['target'] = np.array(targets)
 
     return results_dict
 
@@ -203,18 +198,15 @@ def evaluate(model, generator, data_type, class_weights, comp_res, class_num,
 
     outputs = results_dict['output']  # (audios_num, classes_num)
     folders = results_dict['folder']
-    if data_type == 'dev':
-        targets = results_dict['target']  # (audios_num, classes_num)
+    targets = results_dict['target']  # (audios_num, classes_num)
 
     collected_output = {}
     output_for_loss = {}
-    if data_type == 'dev':
-        new_targets = []
+    new_targets = []
     counter = {}
     for p, fol in enumerate(folders):
         if fol not in collected_output.keys():
-            if data_type == 'dev':
-                new_targets.append(targets[p])
+            new_targets.append(targets[p])
             output_for_loss[fol] = outputs[p]
             collected_output[fol] = np.round(outputs[p])
             counter[fol] = 1
@@ -235,35 +227,30 @@ def evaluate(model, generator, data_type, class_weights, comp_res, class_num,
 
     outputs = np.array(new_outputs)
     folders = np.array(new_folders)
-    if data_type == 'dev':
-        targets = np.array(new_targets)
+    targets = np.array(new_targets)
 
     calculate_time(start_time_dev,
                    time.time(),
-                   'dev',
+                   data_type,
                    logger)
 
-    if data_type == 'test':
-        return outputs, folders
+    batch_weights = find_batch_weights(folders,
+                                       class_weights)
+    loss = mu.calculate_loss(torch.Tensor(outputs),
+                             torch.LongTensor(targets),
+                             batch_weights,
+                             gender_balance)
 
-    if data_type == 'dev':
-        batch_weights = find_batch_weights(folders,
-                                           class_weights)
-        loss = mu.calculate_loss(torch.Tensor(outputs),
-                                 torch.LongTensor(targets),
-                                 batch_weights,
-                                 gender_balance)
-
-        if gender_balance:
-            targets = targets % 2
-        complete_results, per_epoch_pred = prediction_and_accuracy(outputs,
-                                                                   targets,
-                                                                   True,
-                                                                   class_num,
-                                                                   comp_res,
-                                                                   loss, 0,
-                                                                   f_score_average)
-        return complete_results, per_epoch_pred
+    if gender_balance:
+        targets = targets % 2
+    complete_results, per_epoch_pred = prediction_and_accuracy(outputs,
+                                                               targets,
+                                                               True,
+                                                               class_num,
+                                                               comp_res,
+                                                               loss, 0,
+                                                               f_score_average)
+    return complete_results, per_epoch_pred
 
 
 def logging_info(current_dir, data_type=''):
@@ -1116,48 +1103,18 @@ def test():
                                         optimizer=optimizer)
 
         if data_type == 'test' and counter == 0 or data_type == 'dev':
-            if config.EXPERIMENT_DETAILS['SPLIT_BY_GENDER']:
-                generators, cw = organiser.run_test(config,
-                                                    main_logger,
-                                                    False,
-                                                    features_dir,
-                                                    data_saver,
-                                                    tester)
-            else:
-                generator, cw = organiser.run_test(config,
-                                                   main_logger,
-                                                   False,
-                                                   features_dir,
-                                                   data_saver,
-                                                   tester)
+            generator, cw = organiser.run_test(config,
+                                                main_logger,
+                                                False,
+                                                features_dir,
+                                                data_saver,
+                                                tester)
         f_score = None
-        if data_type == 'dev':
-            if config.EXPERIMENT_DETAILS['SPLIT_BY_GENDER']:
-                start = 0
-                for gen in generators:
-                    scores, per_epoch = evaluate(model,
-                                                 gen,
-                                                 data_type,
-                                                 cw[-3],
-                                                 np.zeros(30),
-                                                 num_of_classes,
-                                                 f_score,
-                                                 current_epoch,
-                                                 main_logger,
-                                                 gender_balance)
-
-                    scores[8] = np.mean(scores[0:2])
-                    scores[9] = np.mean(scores[6:8])
-                    scores = [scores[8], scores[0], scores[1], scores[9],
-                              scores[6], scores[7], scores[11], scores[12],
-                              scores[13], scores[14]]
-                    print("Scores: ", scores)
-                    comp_scores[exp_num, start:start + 10] = scores
-                    start += 10
-                    main_logger.info(f"Scores are: \n{scores}")
-            else:
+        if config.EXPERIMENT_DETAILS['SPLIT_BY_GENDER']:
+            start = 0
+            for for_naming, gen in enumerate(generator):
                 scores, per_epoch = evaluate(model,
-                                             generator,
+                                             gen,
                                              data_type,
                                              cw[-3],
                                              np.zeros(30),
@@ -1172,34 +1129,35 @@ def test():
                 scores = [scores[8], scores[0], scores[1], scores[9],
                           scores[6], scores[7], scores[11], scores[12],
                           scores[13], scores[14]]
-                print("Scores: ", scores)
-                comp_scores[exp_num, :] = scores
-                main_logger.info(f"Scores are: \n{scores}")
-        else:
-            pred, folders = evaluate(model,
-                                     generator,
-                                     data_type,
-                                     cw[-3],
-                                     np.zeros(30),
-                                     num_of_classes,
-                                     f_score,
-                                     current_epoch,
-                                     main_logger)
-            pred = np.round(pred).astype(int)
-            if counter == 0:
-                df = pd.DataFrame(data=pred,
-                                  index=list(folders),
-                                  columns=[placeholder])
-                counter += 1
-            else:
-                df[placeholder] = pred
+                if for_naming == 0:
+                    print("Female Scores: ", scores)
+                    main_logger.info(f"Female Scores are: \n{scores}")
+                else:
+                    print("Male Scores: ", scores)
+                    main_logger.info(f"Male Scores are: \n{scores}")
+                comp_scores[exp_num, start:start + 10] = scores
+                start += 10
 
-    if data_type == 'test':
-        df['majority'] = df.mode(axis=1)[0]
-        main_logger.info(df)
-        save_loc = os.path.join(path_to_logger_for_test, 'test_results.pickle')
-        with open(save_loc, 'wb') as f:
-            pickle.dump(df, f)
+        else:
+            scores, per_epoch = evaluate(model,
+                                         generator,
+                                         data_type,
+                                         cw[-3],
+                                         np.zeros(30),
+                                         num_of_classes,
+                                         f_score,
+                                         current_epoch,
+                                         main_logger,
+                                         gender_balance)
+
+            scores[8] = np.mean(scores[0:2])
+            scores[9] = np.mean(scores[6:8])
+            scores = [scores[8], scores[0], scores[1], scores[9],
+                      scores[6], scores[7], scores[11], scores[12],
+                      scores[13], scores[14]]
+            print("Scores: ", scores)
+            comp_scores[exp_num, :] = scores
+            main_logger.info(f"Scores are: \n{scores}")
 
     # tn_fp_fn_tp
     print('Average:')

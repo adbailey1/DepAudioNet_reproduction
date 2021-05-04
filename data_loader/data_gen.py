@@ -464,62 +464,25 @@ class GenerateData:
             batch_folders: Current folders associated to the batch data
             locs_array: Array of the length of each file in the batch
         """
+        test_indices_zeros = np.array(self.zeros_index_dev)
+        test_indices_ones = np.array(self.ones_index_dev)
+        indices = np.concatenate((test_indices_zeros, test_indices_ones),
+                                 axis=0).astype(int)
+
         folders = np.array(self.dev_labels[0])
-        indexes = list(range(folders.shape[0]))
+        classes = np.array(self.dev_labels[1])
         pointer = 0
+        indices = indices.tolist()
+        random.shuffle(indices)
 
-        if self.learning_procedure_dev == 'whole_file' or \
-                self.learning_procedure_dev == 'chunked_file':
-            if len(self.dev_loc) % self.batch_size == 0:
-                dev_counter = (len(self.dev_loc) // self.batch_size)
-            else:
-                dev_counter = (len(self.dev_loc) // self.batch_size) + 1
-            for i in range(dev_counter):
-                batch_indexes = indexes[pointer:pointer+self.batch_size]
-                pointer += self.batch_size
-                locs = [self.dev_loc[inter] for inter in batch_indexes]
-                max_value, locs_array = self.max_loc_diff(locs)
-                current_batch_size = locs_array.shape[0]
-                if self.convert_to_image:
-                    if self.feature_experiment == 'MFCC_concat':
-                        batch_data = np.zeros((max_value*current_batch_size,
-                                               self.freq_bins*3,
-                                               self.feature_dim))
-                    else:
-                        batch_data = np.zeros((max_value*current_batch_size,
-                                               3,
-                                               self.freq_bins,
-                                               self.feature_dim))
-                else:
-                    batch_data = np.zeros((max_value*current_batch_size,
-                                           self.freq_bins,
-                                           self.feature_dim))
-                for p, j in enumerate(locs):
-                    interim_data = self.dev_feat[j[0]:j[1]]
-                    placeholder = p
-                    for k in interim_data:
-                        if self.convert_to_image and not \
-                                self.feature_experiment == 'MFCC_concat':
-                            batch_data[placeholder, :, :, :] = k
-                        else:
-                            batch_data[placeholder, :, :] = k
-                        placeholder += current_batch_size
+        while pointer < len(indices):
+            batch_indices = indices[pointer:pointer + self.batch_size]
+            batch_data = self.dev_feat[batch_indices]
+            batch_labels = classes[batch_indices]
+            batch_folders = folders[batch_indices]
+            batch_data = util.normalise(batch_data, self.mean,
+                                        self.standard_deviation)
+            pointer += self.batch_size
+            locs_array = np.ones((batch_data.shape[0]), dtype=np.int)
 
-                batch_folders = folders[batch_indexes]
-                batch_data = util.normalise(batch_data, self.mean,
-                                            self.standard_deviation)
-
-                yield batch_data, batch_folders, locs_array
-
-        elif self.learning_procedure_dev == 'random_sample':
-            while pointer < self.dev_feat.shape[0]:
-                batch_indexes = indexes[pointer:pointer+self.batch_size]
-                batch_data = self.dev_feat[batch_indexes]
-                batch_folders = folders[batch_indexes]
-                batch_data = util.normalise(batch_data, self.mean,
-                                            self.standard_deviation)
-                pointer += self.batch_size
-                locs_array = np.ones((batch_data.shape[0]), dtype=np.int)
-
-                yield batch_data, batch_folders, locs_array
-
+            yield batch_data, batch_labels, batch_folders, locs_array

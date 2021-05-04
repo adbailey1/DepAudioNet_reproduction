@@ -1094,27 +1094,23 @@ def run_test(config, logger, checkpoint, features_dir, data_saver,
     test_labels = np.concatenate((test_labels, test_indices.reshape(1, -1)))
 
     if tester:
-        # if gender_balance index = [[fem_0, male_0], [fem_1, male_1]]
-        # else index = [0, 1]
-        features, labels, index, loc, class_data = organise_data(config,
-                                                                 logger,
-                                                                 test_labels,
-                                                                 database,
-                                                                 mode_label='test')
+        ml = 'test'
+        labs = test_labels
     else:
-        # if gender_balance index = ([fem_0, male_0], [fem_1, male_1])
-        # else index = [0, 1]
-        # Gender weights list of [fem_nd_w, fem_d_w, male_nd_w, male_d_w]
-        features, labels, index, loc, class_data = organise_data(config,
-                                                                 logger,
-                                                                 dev_labels,
-                                                                 database,
-                                                                 mode_label='dev')
+        ml = 'dev'
+        labs = dev_labels
+    # if gender_balance index = [[fem_0, male_0], [fem_1, male_1]]
+    # else index = [0, 1]
+    features, labels, index, loc, class_data = organise_data(config,
+                                                             logger,
+                                                             labs,
+                                                             database,
+                                                             mode_label=ml)
 
     gender_balance = config.EXPERIMENT_DETAILS['USE_GENDER_WEIGHTS']
 
     zeros, ones, weights, set_weights = class_data
-    if gender_balance and not tester:
+    if gender_balance:
         f_ndep_ind = index[0][0]
         m_ndep_ind = index[0][1]
         f_dep_ind = index[1][0]
@@ -1130,7 +1126,7 @@ def run_test(config, logger, checkpoint, features_dir, data_saver,
             else:
                 labels[3][p] = 3
     split_by_gender = config.EXPERIMENT_DETAILS['SPLIT_BY_GENDER']
-    if split_by_gender and not tester:
+    if split_by_gender:
         if not gender_balance:
             f_ndep_ind, f_dep_ind, m_ndep_ind, m_dep_ind = per_gender_indices(labels)
         female = [f_ndep_ind, f_dep_ind]

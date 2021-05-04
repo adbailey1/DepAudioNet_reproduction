@@ -11,13 +11,13 @@ EXPERIMENT_BRIEF = ''
 # Set to sub to use training/dev sets only
 # Network options: custom or custom_att (to use the attention mechanism)
 EXPERIMENT_DETAILS = {'FEATURE_EXP': 'mel',
-                      'CLASS_WEIGHTS': True,
+                      'CLASS_WEIGHTS': False,
                       'USE_GENDER_WEIGHTS': False,
                       'SUB_SAMPLE_ND_CLASS': True,  # Make len(dep) == len(
                       # ndep)
                       'CROP': True,
                       'OVERSAMPLE': False,
-                      'SPLIT_BY_GENDER': False,  # Only for use in test mode
+                      'SPLIT_BY_GENDER': True,  # Only for use in test mode
                       'FEATURE_DIMENSIONS': 120,
                       'FREQ_BINS': 40,
                       'BATCH_SIZE': 20,
