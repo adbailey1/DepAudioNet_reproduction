@@ -41,6 +41,12 @@ Optional commands are:
   experiment  
 - `--debug` - for debug mode which automatically overwrites an previous data at
   a directory for quicker debugging.
+  
+TEST MODE ONLY:
+-  `--prediction_metric` - this determines how the output is calculated 
+   running on the test set in test mode. 0 = best performing model, 1 = 
+   average of all 
+   models, 2 = majority vote from all models  
 
 For example: To run a training experiment without bash, using a validation
  set, GPU, not visualising the per epoch results graphs, and using main1.py 
@@ -62,7 +68,8 @@ and config_1.py files:
 
 **Results Mel-Spectrogram**
 
-All results are found in our paper: https://arxiv.org/abs/2010.15120
+All results (calculated on the validation set) are found in our paper: 
+https://arxiv.org/abs/2010.15120
 
 We replicated DepAduioNet's reported results by using the following config settings:
 ````

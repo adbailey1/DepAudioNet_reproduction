@@ -27,6 +27,99 @@ learn_rate_factor = 2
 EPS = 1e-12
 
 
+def evaluation_for_test(results_dict, num_class, f_score, main_logger):
+    """
+    This function is only used for mode==test and data_type=='test'. Every
+    prediction for each folder in the test set is accumulated to results_dict
+    along with the number of instances of each folder. There will be multiple
+    predictions for each folder depending on how many times the experiment
+    was run during training (e.g. 5). If the user sets argument:
+    prediction_metric=0 -> the accuracy will be determined for every experiment
+    iteration (e.g. 5) and the best performing model will be selected.
+    prediction_metric=1 -> the average of the accumulated predictions for
+    each folder will be taken and the final score will relate to these
+    averaged results.
+    prediction_metric=2 -> The majority vote of the accumulated predictions
+    for each folder will be taken and the final score will related to these
+    results
+    Input
+        results_dict: dictionary key: output, target, accum. For each of
+                      these keys is a corresponding dictionary where key:
+                      folder, value relates to the super key: output ->
+                      predictions from experiments, target -> corresponding
+                      label for the folder, accum -> the accumulated
+                      instances of each folder
+        num_class: int - Number of classes in the dataset
+        f_score: str - Type of F1 Score processing
+
+    Outputs:
+        scores: List - contains accuracy, fscore and tn_fp_fn_tp
+    """
+    temp_tar = np.array(list(results_dict['target'].values()))
+    final_results = {}
+    # Pick best performing model
+    if prediction_metric == 0:
+        f_score_avg = []
+        temp_out = np.zeros((exp_runthrough,
+                             len(results_dict['output'].keys())))
+        temp_scores = np.zeros((exp_runthrough, 15))
+        for pos, f in enumerate(results_dict['output'].keys()):
+            temp_out[:, pos] = list(results_dict['output'][f] /
+                                    results_dict['accum'][f])
+        for exp in range(exp_runthrough):
+            temp_scores[exp, :], _ = prediction_and_accuracy(temp_out[exp, :],
+                                                             temp_tar,
+                                                             True,
+                                                             num_class,
+                                                             np.zeros(15),
+                                                             0,
+                                                             0,
+                                                             f_score)
+            f_score_avg = f_score_avg + [np.mean(temp_scores[exp, 6:8])]
+        best_result_index = f_score_avg.index(max(f_score_avg))
+        print(f"\nThe best performing model was experiment: "
+              f"{best_result_index+1}")
+        main_logger.info(f"The best performing model was experiment: "
+                         f"{best_result_index + 1}")
+        scores = temp_scores[best_result_index, :]
+    # Average the performance of all models
+    elif prediction_metric == 1:
+        print("\nPerforming averaging of accumulated predictions")
+        for f in results_dict['output'].keys():
+            final_results[f] = np.average(
+                results_dict['output'][f] / results_dict['accum'][f])
+        temp_out = np.array(list(final_results.values()))
+        scores, _ = prediction_and_accuracy(temp_out,
+                                            temp_tar,
+                                            True,
+                                            num_class,
+                                            np.zeros(15),
+                                            0,
+                                            0,
+                                            f_score)
+    # Calculate majority vote from all models
+    elif prediction_metric == 2:
+        print("\nPerforming majority vote on accumulated predictions")
+        for f in results_dict['output'].keys():
+            final_results[f] = np.average(
+                np.round(results_dict['output'][f] / results_dict['accum'][f]))
+        temp_out = np.array(list(final_results.values()))
+        scores, _ = prediction_and_accuracy(temp_out,
+                                            temp_tar,
+                                            True,
+                                            num_class,
+                                            np.zeros(15),
+                                            0,
+                                            0,
+                                            f_score)
+    scores[8] = np.mean(scores[0:2])
+    scores[9] = np.mean(scores[6:8])
+    scores = [scores[8], scores[0], scores[1], scores[9], scores[6], scores[7],
+              scores[11], scores[12], scores[13], scores[14]]
+
+    return scores
+
+
 def calculate_accuracy(target, predict, classes_num, f_score_average):
     """
     Calculates accuracy, precision, recall, F1-Score, True Negative,
@@ -202,11 +295,11 @@ def evaluate(model, generator, data_type, class_weights, comp_res, class_num,
 
     collected_output = {}
     output_for_loss = {}
-    new_targets = []
+    collected_targets = {}
     counter = {}
     for p, fol in enumerate(folders):
         if fol not in collected_output.keys():
-            new_targets.append(targets[p])
+            collected_targets[fol] = targets[p]
             output_for_loss[fol] = outputs[p]
             collected_output[fol] = np.round(outputs[p])
             counter[fol] = 1
@@ -215,15 +308,24 @@ def evaluate(model, generator, data_type, class_weights, comp_res, class_num,
             collected_output[fol] += np.round(outputs[p])
             counter[fol] += 1
 
+    if mode == 'test':
+        intermediate_outputs = collected_output
+        intermediate_counter = counter
+        intermediate_targets = collected_targets
     new_outputs = []
     new_folders = []
+    new_targets = []
     new_output_for_loss = []
+    # This is essentially performing majority vote. We have rounded all the
+    # predictions made per file. We now divide the resulting value by the
+    # number of instances per file.
     for co in collected_output:
         tmp = collected_output[co] / counter[co]
         new_outputs.append(tmp)
         tmp = output_for_loss[co] / counter[co]
         new_output_for_loss.append(tmp)
         new_folders.append(co)
+        new_targets.append(collected_targets[co])
 
     outputs = np.array(new_outputs)
     folders = np.array(new_folders)
@@ -250,7 +352,11 @@ def evaluate(model, generator, data_type, class_weights, comp_res, class_num,
                                                                comp_res,
                                                                loss, 0,
                                                                f_score_average)
-    return complete_results, per_epoch_pred
+    if data_type == 'test':
+        return complete_results, (per_epoch_pred, intermediate_outputs, \
+               intermediate_counter, intermediate_targets)
+    else:
+        return complete_results, per_epoch_pred
 
 
 def logging_info(current_dir, data_type=''):
@@ -1056,8 +1162,12 @@ def train(model, workspace_files_dir):
 def test():
     """
     Re-runs experiment details from config file by loading the best
-    perfroming epochs and if data_type='dev' re-run using the validation
-    data, if data_type='test' re-run using the test data
+    performing epochs and if data_type='dev' re-run using the validation
+    data, if data_type='test' re-run using the test data. The test set
+    results will be displayed according to the user specified argument
+    prediction_metric. There are 3 options, pick the best experiment model,
+    average the experiment models, calculate the majority vote of the
+    experiment models.
     """
     if validate:
         tester = False
@@ -1072,8 +1182,13 @@ def test():
     else:
         comp_scores = np.zeros((exp_runthrough, 10))
 
+    if data_type == 'test':
+        results = {'output': {}, 'target': {}, 'accum': {}}
+        if config.EXPERIMENT_DETAILS['SPLIT_BY_GENDER']:
+            results = {'female': {'output': {}, 'target': {}, 'accum': {}},
+                       'male': {'output': {}, 'target': {}, 'accum': {}}}
+
     for exp_num in range(exp_runthrough):
-        placeholder = str(exp_num+1)
         model_dir = os.path.join(current_dir,
                                  'model',
                                  folder_extensions[exp_num])
@@ -1104,20 +1219,20 @@ def test():
 
         if data_type == 'test' and counter == 0 or data_type == 'dev':
             generator, cw = organiser.run_test(config,
-                                                main_logger,
-                                                False,
-                                                features_dir,
-                                                data_saver,
-                                                tester)
+                                               main_logger,
+                                               False,
+                                               features_dir,
+                                               data_saver,
+                                               tester)
         f_score = None
         if config.EXPERIMENT_DETAILS['SPLIT_BY_GENDER']:
             start = 0
-            for for_naming, gen in enumerate(generator):
+            for gen_number, gen in enumerate(generator):
                 scores, per_epoch = evaluate(model,
                                              gen,
                                              data_type,
                                              cw[-3],
-                                             np.zeros(30),
+                                             np.zeros(15),
                                              num_of_classes,
                                              f_score,
                                              current_epoch,
@@ -1129,21 +1244,33 @@ def test():
                 scores = [scores[8], scores[0], scores[1], scores[9],
                           scores[6], scores[7], scores[11], scores[12],
                           scores[13], scores[14]]
-                if for_naming == 0:
-                    print("Female Scores: ", scores)
-                    main_logger.info(f"Female Scores are: \n{scores}")
+                if gen_number == 0:
+                    dictionary_key = 'female'
                 else:
-                    print("Male Scores: ", scores)
-                    main_logger.info(f"Male Scores are: \n{scores}")
+                    dictionary_key = 'male'
+
+                print(f"{dictionary_key} Scores: {scores}")
+                main_logger.info(f"{dictionary_key} Scores are: \n{scores}")
                 comp_scores[exp_num, start:start + 10] = scores
                 start += 10
 
+                if data_type == 'test':
+                    per_epoch, outputs, accum, targets = per_epoch
+                    for count, folder in enumerate(outputs):
+                        if folder not in results[dictionary_key]['output'].keys():
+                            results[dictionary_key]['output'][folder] = np.array(outputs[folder][0])
+                            results[dictionary_key]['accum'][folder] = accum[folder]
+                            results[dictionary_key]['target'][folder] = targets[folder]
+                        else:
+                            results[dictionary_key]['output'][folder] = np.append(
+                                results[dictionary_key]['output'][folder],
+                                outputs[folder][0])
         else:
             scores, per_epoch = evaluate(model,
                                          generator,
                                          data_type,
                                          cw[-3],
-                                         np.zeros(30),
+                                         np.zeros(15),
                                          num_of_classes,
                                          f_score,
                                          current_epoch,
@@ -1155,15 +1282,47 @@ def test():
             scores = [scores[8], scores[0], scores[1], scores[9],
                       scores[6], scores[7], scores[11], scores[12],
                       scores[13], scores[14]]
+
             print("Scores: ", scores)
             comp_scores[exp_num, :] = scores
             main_logger.info(f"Scores are: \n{scores}")
 
-    # tn_fp_fn_tp
-    print('Average:')
-    comp_scores_avg = np.mean(comp_scores, axis=0)
-    print(comp_scores_avg)
-    main_logger.info(f"Average Scores: \n{comp_scores_avg}")
+            if data_type == 'test':
+                per_epoch, outputs, accum, targets = per_epoch
+                for count, folder in enumerate(outputs):
+                    if folder not in results['output'].keys():
+                        results['output'][folder] = np.array(outputs[folder][0])
+                        results['accum'][folder] = accum[folder]
+                        results['target'][folder] = targets[folder]
+                    else:
+                        results['output'][folder] = np.append(
+                            results['output'][folder], outputs[folder][0])
+
+    if data_type == 'test':
+        if config.EXPERIMENT_DETAILS['SPLIT_BY_GENDER']:
+            final_results = {'female': {}, 'male': {}}
+            comp_scores = []
+            for gen_ind in final_results:
+                temp_scores = evaluation_for_test(results[gen_ind],
+                                                  num_of_classes,
+                                                  f_score,
+                                                  main_logger)
+                comp_scores = comp_scores + temp_scores
+                print(f"{gen_ind} Test output Scores: {temp_scores}")
+                main_logger.info(f"{gen_ind} Test output Scores:"
+                                 f" {temp_scores}")
+        else:
+            comp_scores = evaluation_for_test(results,
+                                              num_of_classes,
+                                              f_score,
+                                              main_logger)
+            print("Test output Scores: ", comp_scores)
+            main_logger.info(f"Test output Scores: {comp_scores}")
+    else:
+        # Acc_avg, Acc_0, Acc_1, F_avg, F_0, F_1, tn_fp_fn_tp
+        comp_scores_avg = np.mean(comp_scores, axis=0)
+        print(f"\nAverage: {comp_scores_avg}")
+        main_logger.info(f"Average Scores: \n{comp_scores_avg}")
     if data_type == 'dev' and config.EXPERIMENT_DETAILS['SPLIT_BY_GENDER']:
         tp1 = np.sum(comp_scores[:, 9])
         fn1 = np.sum(comp_scores[:, 8])
@@ -1225,6 +1384,10 @@ if __name__ == '__main__':
                               default=False,
                               help='Set to true if working with less than '
                                    '32GB RAM')
+    parser_train.add_argument('--prediction_metric',
+                              type=int,
+                              default=0,
+                              help='NOT APPLICABLE FOR TRAINING')
 
     parser_test = sub_parser.add_parser('test')
     parser_test.add_argument('--vis',
@@ -1246,6 +1409,13 @@ if __name__ == '__main__':
                              default=1,
                              help='Used to determine which main and config '
                                   'files to save')
+    parser_test.add_argument('--prediction_metric',
+                             type=int,
+                             default=0,
+                             help='How do you want to average the outputs of '
+                                  'all models? 0: best single model, '
+                                  '1: average of models, 2: majority vote of '
+                                  'models')
     parser_test.add_argument('--debug',
                              action='store_true',
                              default=False,
@@ -1260,6 +1430,7 @@ if __name__ == '__main__':
     cuda = args.cuda
     validate = args.validate
     position = args.position
+    prediction_metric = args.prediction_metric
     workspace_main_dir = config.WORKSPACE_MAIN_DIR
     features_dir = os.path.join(workspace_main_dir, config.FOLDER_NAME)
     gender = config.GENDER

@@ -17,7 +17,7 @@ EXPERIMENT_DETAILS = {'FEATURE_EXP': 'mel',
                       # ndep)
                       'CROP': True,
                       'OVERSAMPLE': False,
-                      'SPLIT_BY_GENDER': True,  # Only for use in test mode
+                      'SPLIT_BY_GENDER': False,  # Only for use in test mode
                       'FEATURE_DIMENSIONS': 120,
                       'FREQ_BINS': 40,
                       'BATCH_SIZE': 20,
