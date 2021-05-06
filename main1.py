@@ -735,7 +735,7 @@ def print_log_results(epoch, results, data_type):
 
 
 def final_organisation(scores, train_pred, val_pred, df, patience, epoch,
-                       workspace_files_dir):
+                       workspace_files_dir, data_saver):
     """
     Records final information with the logger such as the best scores for
     training and validation and saves/copies files from the current
@@ -778,7 +778,8 @@ def final_organisation(scores, train_pred, val_pred, df, patience, epoch,
                             df,
                             train_pred,
                             val_pred,
-                            scores)
+                            scores,
+                            data_saver)
 
     copy_tree(workspace_files_dir, current_dir+'/daic')
     dirs = os.listdir(workspace_files_dir)
@@ -1146,7 +1147,8 @@ def train(model, workspace_files_dir):
                                        df,
                                        patience,
                                        placeholder,
-                                       workspace_files_dir)
+                                       workspace_files_dir,
+                                       data_saver)
 
                     plot_graph(placeholder,
                                df,
@@ -1162,7 +1164,8 @@ def train(model, workspace_files_dir):
                                    df,
                                    patience,
                                    placeholder,
-                                   workspace_files_dir)
+                                   workspace_files_dir,
+                                   data_saver)
                 break
 
 
