@@ -464,10 +464,20 @@ class GenerateData:
             batch_folders: Current folders associated to the batch data
             locs_array: Array of the length of each file in the batch
         """
-        test_indices_zeros = np.array(self.zeros_index_dev)
-        test_indices_ones = np.array(self.ones_index_dev)
-        indices = np.concatenate((test_indices_zeros, test_indices_ones),
-                                 axis=0).astype(int)
+        if self.gender_balance:
+            test_indices_zeros_f = np.array(self.zeros_index_dev_f)
+            test_indices_ones_f = np.array(self.ones_index_dev_f)
+            test_indices_zeros_m = np.array(self.zeros_index_dev_m)
+            test_indices_ones_m = np.array(self.ones_index_dev_m)
+            indices = np.concatenate((test_indices_zeros_f,
+                                      test_indices_ones_f,
+                                      test_indices_zeros_m,
+                                      test_indices_ones_m), axis=0).astype(int)
+        else:
+            test_indices_zeros = np.array(self.zeros_index_dev)
+            test_indices_ones = np.array(self.ones_index_dev)
+            indices = np.concatenate((test_indices_zeros, test_indices_ones),
+                                     axis=0).astype(int)
 
         folders = np.array(self.dev_labels[0])
         classes = np.array(self.dev_labels[1])

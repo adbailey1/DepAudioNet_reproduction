@@ -997,22 +997,23 @@ def run_train(config, logger, checkpoint, features_dir, data_saver):
     zeros, ones, weights, set_weights = class_data
     dev_weights = {}
     for i in range(len(dev_labels[0])):
+        folder = dev_labels[0][i]
         clss = dev_labels[1][i]
         gender = dev_labels[3][i]
         if clss == 0 or clss == 2:
             if gender_balance and gender == 0:
-                dev_weights[f] = set_weights[0]
+                dev_weights[folder] = set_weights[0]
             elif gender_balance and gender == 1:
-                dev_weights[f] = set_weights[2]
+                dev_weights[folder] = set_weights[2]
             else:
-                dev_weights[f] = set_weights[0]
+                dev_weights[folder] = set_weights[0]
         else:
             if gender_balance and gender == 0:
-                dev_weights[f] = set_weights[1]
+                dev_weights[folder] = set_weights[1]
             elif gender_balance and gender == 1:
-                dev_weights[f] = set_weights[3]
+                dev_weights[folder] = set_weights[3]
             else:
-                dev_weights[f] = set_weights[1]
+                dev_weights[folder] = set_weights[1]
     class_data = zeros, ones, weights, set_weights, dev_weights
 
     generator = data_gen.GenerateData(train_labels=train_labels,
@@ -1094,10 +1095,10 @@ def run_test(config, logger, checkpoint, features_dir, data_saver,
     test_labels = np.concatenate((test_labels, test_indices.reshape(1, -1)))
 
     if tester:
-        ml = 'test'
+        mode_lab = 'test'
         labs = test_labels
     else:
-        ml = 'dev'
+        mode_lab = 'dev'
         labs = dev_labels
     # if gender_balance index = [[fem_0, male_0], [fem_1, male_1]]
     # else index = [0, 1]
@@ -1105,7 +1106,7 @@ def run_test(config, logger, checkpoint, features_dir, data_saver,
                                                              logger,
                                                              labs,
                                                              database,
-                                                             mode_label=ml)
+                                                             mode_label=mode_lab)
 
     gender_balance = config.EXPERIMENT_DETAILS['USE_GENDER_WEIGHTS']
 
@@ -1116,6 +1117,7 @@ def run_test(config, logger, checkpoint, features_dir, data_saver,
         f_dep_ind = index[1][0]
         m_dep_ind = index[1][1]
 
+        index = [f_ndep_ind, f_dep_ind, m_ndep_ind, m_dep_ind]
         for p, i in enumerate(labels[3]):
             if labels[3][p] == 0 and i == 0:
                 pass

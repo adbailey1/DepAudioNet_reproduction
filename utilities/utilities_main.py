@@ -12,8 +12,7 @@ import torch
 import random
 
 
-def save_model(epoch_iter, model, optimizer, main_logger, model_dir,
-               data_saver):
+def save_model(epoch_iter, model, optimizer, main_logger, model_dir):
     """
     Saves the model weights along with the current epoch and all the random
     states that are used during the experiment. Also saves the current state
@@ -42,10 +41,6 @@ def save_model(epoch_iter, model, optimizer, main_logger, model_dir,
     save_out_path = os.path.join(model_dir,
                                  f"md_{epoch_iter}_epochs.pth")
     torch.save(save_out_dict, save_out_path)
-
-    save_out_path = os.path.join(model_dir, 'data_saver.pickle')
-    with open(save_out_path, 'wb') as f:
-        pickle.dump(data_saver, f)
 
 
 def load_model(checkpoint_path, model, optimizer):
@@ -76,17 +71,11 @@ def load_model(checkpoint_path, model, optimizer):
     np.random.set_state(checkpoint['numpy_rng_state'])
     random.setstate(checkpoint['random_rng_state'])
 
-    data_saver_path = checkpoint_path.split('/')
-    data_saver_path = checkpoint_path.replace(data_saver_path[-1],
-                                              'data_saver.pickle')
-    with open(data_saver_path, 'rb') as f:
-        data_saver = pickle.load(f)
-
-    return epoch, data_saver
+    return epoch
 
 
 def save_model_outputs(model_dir, dataframe, train_pred, val_pred,
-                       best_scores):
+                       best_scores, data_saver):
     """
     Saves the outputs of a model for checkpointing or future analysis for a
     completed experiment.
@@ -113,8 +102,12 @@ def save_model_outputs(model_dir, dataframe, train_pred, val_pred,
     with open(save_path, 'wb') as f:
         pickle.dump((best_scores[1:]), f)
 
+    save_out_path = os.path.join(model_dir, 'data_saver.pickle')
+    with open(save_out_path, 'wb') as f:
+        pickle.dump(data_saver, f)
 
-def load_model_outputs(model_dir):
+
+def load_model_outputs(model_dir, data_mode='train'):
     """
     Loads the saved outputs of a model from a checkpoint.
 
@@ -132,20 +125,30 @@ def load_model_outputs(model_dir):
         best_scores_2: Same as best_scores but more accurate and only
                        holds validation position
     """
-    load_path = os.path.join(model_dir, 'complete_results.pickle')
-    with open(load_path, 'rb') as f:
-        dataframe = pickle.load(f)
+    if data_mode != 'train':
+        data_saver_path = model_dir.replace(model_dir.split('/')[-1],
+                                            'data_saver.pickle')
+        with open(data_saver_path, 'rb') as f:
+            return pickle.load(f)
+    else:
+        load_path = os.path.join(model_dir, 'complete_results.pickle')
+        with open(load_path, 'rb') as f:
+            dataframe = pickle.load(f)
 
-    load_path = os.path.join(model_dir, 'predicted_labels_train_val.pickle')
-    with open(load_path, 'rb') as f:
-        complete_predictions = pickle.load(f)
-    train_pred, val_pred = complete_predictions
+        load_path = os.path.join(model_dir, 'predicted_labels_train_val.pickle')
+        with open(load_path, 'rb') as f:
+            complete_predictions = pickle.load(f)
+        train_pred, val_pred = complete_predictions
 
-    load_path = os.path.join(model_dir, 'best_scores.pickle')
-    with open(load_path, 'rb') as f:
-        best_scores = pickle.load(f)
+        load_path = os.path.join(model_dir, 'best_scores.pickle')
+        with open(load_path, 'rb') as f:
+            best_scores = pickle.load(f)
 
-    return dataframe, train_pred, val_pred, best_scores
+        data_saver_path = os.path.join(model_dir, 'data_saver.pickle')
+        with open(data_saver_path, 'rb') as f:
+            data_saver = pickle.load(f)
+
+        return dataframe, train_pred, val_pred, best_scores, data_saver
 
 
 def create_directories(location, folders_to_make):

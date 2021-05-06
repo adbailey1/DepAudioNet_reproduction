@@ -418,7 +418,8 @@ def create_model():
         model = CustomMel()
     else:
         model = CustomRaw()
-    model.cuda()
+    if cuda:
+        model.cuda()
 
     return model
 
@@ -979,20 +980,19 @@ def train(model, workspace_files_dir):
     learning_rate = config.EXPERIMENT_DETAILS['LEARNING_RATE']
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     main_logger.info(f"Optimiser: ADAM. Learning Rate: {learning_rate}")
+    # Need to load the model output variables first to build generator below
+    # After the generator is built, we can load any previous unfinished model
+    # Loading all states and variables before the generator alters the random
+    # number generator for continuing training and therefore not reproducible
     if checkpoint:
-        start_epoch, data_saver = util.load_model(checkpoint_run,
-                                                  model,
-                                                  optimizer)
-        df, comp_train_pred, comp_val_pred, best_scores = \
+        df, comp_train_pred, comp_val_pred, best_scores, data_saver = \
             util.load_model_outputs(model_dir)
     else:
-        start_epoch = 0
         # train_acc, train_fscore, train_loss, val_acc, val_fscore, val_loss
         best_scores = [0] * 16
         comp_train_pred = comp_val_pred = 0
         df = pd.DataFrame(columns=config_dataset.COLUMN_NAMES)
         data_saver = {}
-
     print('Generating data for training')
     # train_info tuple of number of zeros, ones and class weights and if
     # gender balance is specified, gender weights (also tuple of
@@ -1002,6 +1002,16 @@ def train(model, workspace_files_dir):
                                           checkpoint,
                                           features_dir,
                                           data_saver)
+    if checkpoint:
+        start_epoch = util.load_model(checkpoint_run,
+                                      model,
+                                      optimizer)
+    else:
+        start_epoch = 0
+        # train_acc, train_fscore, train_loss, val_acc, val_fscore, val_loss
+        best_scores = [0] * 16
+        comp_train_pred = comp_val_pred = 0
+        df = pd.DataFrame(columns=config_dataset.COLUMN_NAMES)
 
     avg_counter = per_epoch_train_pred = 0
     # Train/Val, Accuracy, Precision, Recall, Fscore, Loss(single), mean_acc/f
@@ -1117,13 +1127,13 @@ def train(model, workspace_files_dir):
                             model,
                             optimizer,
                             main_logger,
-                            model_dir,
-                            data_saver)
+                            model_dir)
             util.save_model_outputs(model_dir,
                                     df,
                                     comp_train_pred,
                                     comp_val_pred,
-                                    best_scores)
+                                    best_scores,
+                                    data_saver)
 
             # Stop learning
             patience = final_iteration+1
@@ -1213,9 +1223,11 @@ def test():
                 current_epoch = int(file.split('_')[1])
                 model_dir = os.path.join(model_dir, file)
 
-        _, data_saver = util.load_model(checkpoint_path=model_dir,
-                                        model=model,
-                                        optimizer=optimizer)
+        _ = util.load_model(checkpoint_path=model_dir,
+                            model=model,
+                            optimizer=optimizer)
+        data_saver = util.load_model_outputs(model_dir,
+                                             'test')
 
         if data_type == 'test' and counter == 0 or data_type == 'dev':
             generator, cw = organiser.run_test(config,
@@ -1260,7 +1272,12 @@ def test():
                         if folder not in results[dictionary_key]['output'].keys():
                             results[dictionary_key]['output'][folder] = np.array(outputs[folder][0])
                             results[dictionary_key]['accum'][folder] = accum[folder]
-                            results[dictionary_key]['target'][folder] = targets[folder]
+                            if gender_balance:
+                                results[dictionary_key]['target'][folder] = \
+                                    targets[folder] % 2
+                            else:
+                                results[dictionary_key]['target'][folder] = \
+                                    targets[folder]
                         else:
                             results[dictionary_key]['output'][folder] = np.append(
                                 results[dictionary_key]['output'][folder],
@@ -1293,7 +1310,10 @@ def test():
                     if folder not in results['output'].keys():
                         results['output'][folder] = np.array(outputs[folder][0])
                         results['accum'][folder] = accum[folder]
-                        results['target'][folder] = targets[folder]
+                        if gender_balance:
+                            results['target'][folder] = targets[folder] % 2
+                        else:
+                            results['target'][folder] = targets[folder]
                     else:
                         results['output'][folder] = np.append(
                             results['output'][folder], outputs[folder][0])
