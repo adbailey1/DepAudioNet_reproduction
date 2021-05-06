@@ -1009,9 +1009,6 @@ def train(model, workspace_files_dir):
     else:
         start_epoch = 0
         # train_acc, train_fscore, train_loss, val_acc, val_fscore, val_loss
-        best_scores = [0] * 16
-        comp_train_pred = comp_val_pred = 0
-        df = pd.DataFrame(columns=config_dataset.COLUMN_NAMES)
 
     avg_counter = per_epoch_train_pred = 0
     # Train/Val, Accuracy, Precision, Recall, Fscore, Loss(single), mean_acc/f
