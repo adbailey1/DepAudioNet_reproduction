@@ -110,7 +110,7 @@ Results on Dataset's Validation Set:
 
 ````
 |F1(ND)|F1(D) |F1 avg|
-| .725 | .520 | .622 |
+| .732 | .522 | .627 |
 ````
 
 - Use: `learn_rate_factor = 3`
@@ -119,7 +119,7 @@ Results on Dataset's Validation Set:
 
 ````
 |F1(ND)|F1(D) |F1 avg|
-| .750 | .511 | .631 | 
+| .740 | .539 | .634 | 
 ````
 
 **Raw Audio Results**
@@ -163,7 +163,7 @@ Results on Dataset's Validation Set:
 
 ````
 |F1(ND)|F1(D) |F1 avg|
-| .738 | .510 | .624 |
+| .766 | .531 | .648 |
 ````
 
 - Use: `learn_rate_factor = 3`
@@ -172,7 +172,7 @@ Results on Dataset's Validation Set:
 
 ````
 |F1(ND)|F1(D) |F1 avg|
-| .765 | .568 | .667 | 
+| .796 | .520 | .658 | 
 ````
 
 **Notes**
