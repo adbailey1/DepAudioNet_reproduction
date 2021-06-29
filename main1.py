@@ -466,7 +466,7 @@ def setup(current_dir, model_dir, data_type='', path_to_logger_for_test=None):
             if int(temp_dirs[0].split('_')[1]) == final_iteration and mode ==\
                     'train':
                 directory = model_dir.split('/')[-1]
-                final_directory = model_dir.replace(directory)
+                final_directory = model_dir.replace(directory, str(exp_runthrough))
                 if os.path.exists(final_directory):
                     temp_dirs2 = os.listdir(final_directory)
                     temp_dirs2 = natsort.natsorted(temp_dirs2, reverse=True)
