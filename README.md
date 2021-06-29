@@ -28,7 +28,7 @@ obtained
 Use the config file to set experiment preferences and locations of the code, workspace, and dataset directories. There are two config files here. config.py is usually used as a template and further config files are added with the suffix '_1', '_2' etc for different experiments. 
 
 Updated the run.sh file if you want to run the experiment through bash (call
- `./run.sh` from terminal). The arguments required by calling main.py
+ `./run.sh` from terminal). The arguments required by calling main1.py
   are: 
  - `train` - to train a model 
 - `test` - to test a trained model
@@ -37,7 +37,7 @@ Optional commands are:
 - `--validate` - to train a model with a validation set
 - `--cuda` - to train a model using a GPU
 - `--vis` - to visualise the learning graph at the end of every epoch
-- `--position` - to specify which main.py and config.py file are used for this 
+- `--position` - to specify which main1.py and config.py file are used for this 
   experiment  
 - `--debug` - for debug mode which automatically overwrites an previous data at
   a directory for quicker debugging.
@@ -52,19 +52,19 @@ For example: To run a training experiment without bash, using a validation
  set, GPU, not visualising the per epoch results graphs, and using main1.py 
 and config_1.py files:
  
- `python3 main.py train --validate --cuda --vis --position=1`
+ `python3 main1.py train --validate --cuda --vis --position=1`
  
  Without using the validation set:
  
- `python3 main.py train --cuda --vis --position=1`
+ `python3 main1.py train --cuda --vis --position=1`
  
  Running trained models again on the validation set:
  
- `python3 main.py test --validate --cuda --vis --position=1`
+ `python3 main1.py test --validate --cuda --vis --position=1`
  
  Running trained models on the test set:
  
- `python3 main.py test --cuda --vis --position=1`
+ `python3 main1.py test --cuda --vis --position=1`
 
 **Results Mel-Spectrogram**
 
