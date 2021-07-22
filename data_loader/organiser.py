@@ -891,7 +891,7 @@ def log_train_data(logger, folder_weights, partition_weights=None,
                     f"{partition_weights[3]}\n")
 
 
-def run_train(config, logger, checkpoint, features_dir, data_saver):
+def run_train(config, logger, checkpoint, features_dir, data_saver, val=True):
     """
     High level function to process the training and validation data. This
     function obtains the file locations, folds for training/validation sets,
@@ -903,6 +903,7 @@ def run_train(config, logger, checkpoint, features_dir, data_saver):
         features_dir: Path to summary.pickle and database.h5 files
         data_saver: Contains the mean and std of the data if loading from a
                     checkpoint
+        val: if True we are training with a validation set
 
     Outputs:
         generator: Generator for training and validation batch data loading
@@ -951,6 +952,9 @@ def run_train(config, logger, checkpoint, features_dir, data_saver):
     train_labels = np.concatenate((train_labels, train_indices.reshape(1, -1)))
     dev_labels = np.concatenate((dev_labels, dev_indices.reshape(1, -1)))
 
+    if not val:
+        train_labels = np.vstack((train_labels, dev_labels))
+
     # class data is tuple (Dict(zeros), Dict(ones), Dict(weights), set_weights)
     train_features, train_labels, train_index, train_loc, class_data = \
         organise_data(config,
@@ -959,11 +963,16 @@ def run_train(config, logger, checkpoint, features_dir, data_saver):
                       database,
                       mode_label='train')
 
-    dev_features, dev_labels, dev_index, dev_loc, _ = organise_data(config,
-                                                                    logger,
-                                                                    dev_labels,
-                                                                    database,
-                                                                    mode_label='dev')
+    if val:
+        dev_features, dev_labels, dev_index, dev_loc, _ = organise_data(config,
+                                                                        logger,
+                                                                        dev_labels,
+                                                                        database,
+                                                                        mode_label='dev')
+    else:
+        dev_features = dev_labels = dev_loc = 0
+        dev_index = [[], []]
+
     gender_balance = config.EXPERIMENT_DETAILS['USE_GENDER_WEIGHTS']
     if gender_balance:
         female_ndep_ind = train_index[0][0]
@@ -978,43 +987,49 @@ def run_train(config, logger, checkpoint, features_dir, data_saver):
                        class_data[-1],
                        train_index)
 
-        dev_index = [dev_index[0][0], dev_index[1][0], dev_index[0][1],
-                     dev_index[1][1]]
-        # For use later, set the labels to 0 (fnd), 1 (fd), 2 (mnd), and 3 (md)
-        for p, i in enumerate(dev_labels[3]):
-            if dev_labels[1][p] == 0 and i == 0:
-                pass
-            elif dev_labels[1][p] == 0 and i == 1:
-                dev_labels[1][p] = 2
-            elif dev_labels[1][p] == 1 and i == 0:
-                dev_labels[1][p] = 1
-            else:
-                dev_labels[1][p] = 3
+        if val:
+            dev_index = [dev_index[0][0], dev_index[1][0], dev_index[0][1],
+                         dev_index[1][1]]
+            # For use later, set the labels to 0 (fnd), 1 (fd), 2 (mnd), and 3 (md)
+            for p, i in enumerate(dev_labels[3]):
+                if dev_labels[1][p] == 0 and i == 0:
+                    pass
+                elif dev_labels[1][p] == 0 and i == 1:
+                    dev_labels[1][p] = 2
+                elif dev_labels[1][p] == 1 and i == 0:
+                    dev_labels[1][p] = 1
+                else:
+                    dev_labels[1][p] = 3
+        else:
+            dev_index = [[], [], [], []]
     else:
         log_train_data(logger,
                        class_data[-1])
 
     zeros, ones, weights, set_weights = class_data
-    dev_weights = {}
-    for i in range(len(dev_labels[0])):
-        folder = dev_labels[0][i]
-        clss = dev_labels[1][i]
-        gender = dev_labels[3][i]
-        if clss == 0 or clss == 2:
-            if gender_balance and gender == 0:
-                dev_weights[folder] = set_weights[0]
-            elif gender_balance and gender == 1:
-                dev_weights[folder] = set_weights[2]
+    if val:
+        dev_weights = {}
+        for i in range(len(dev_labels[0])):
+            folder = dev_labels[0][i]
+            clss = dev_labels[1][i]
+            gender = dev_labels[3][i]
+            if clss == 0 or clss == 2:
+                if gender_balance and gender == 0:
+                    dev_weights[folder] = set_weights[0]
+                elif gender_balance and gender == 1:
+                    dev_weights[folder] = set_weights[2]
+                else:
+                    dev_weights[folder] = set_weights[0]
             else:
-                dev_weights[folder] = set_weights[0]
-        else:
-            if gender_balance and gender == 0:
-                dev_weights[folder] = set_weights[1]
-            elif gender_balance and gender == 1:
-                dev_weights[folder] = set_weights[3]
-            else:
-                dev_weights[folder] = set_weights[1]
-    class_data = zeros, ones, weights, set_weights, dev_weights
+                if gender_balance and gender == 0:
+                    dev_weights[folder] = set_weights[1]
+                elif gender_balance and gender == 1:
+                    dev_weights[folder] = set_weights[3]
+                else:
+                    dev_weights[folder] = set_weights[1]
+        class_data = zeros, ones, weights, set_weights, dev_weights
+    else:
+        class_data = zeros, ones, weights, set_weights, {}
 
     generator = data_gen.GenerateData(train_labels=train_labels,
                                       dev_labels=dev_labels,

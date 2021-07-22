@@ -68,7 +68,7 @@ def plot_spectrogram(spec, type_of_spec=''):
 
 
 def plot_graph(epoch, results, total_epochs, model_dir, early_stopper=False,
-               vis=False):
+               vis=False, val=True):
     """
     Plots a graph of the performance of a network up to a certain epoch
 
@@ -81,6 +81,7 @@ def plot_graph(epoch, results, total_epochs, model_dir, early_stopper=False,
         early_stopper: bool - If True, saves the plot even if total_epochs
                        has not been reached
         vis: bool - Set True if plot is to be visible after every epoch
+        val: bool - Set True if training with a validation set
 
     Outputs:
         fig: matplot of the current progress graph
@@ -96,13 +97,16 @@ def plot_graph(epoch, results, total_epochs, model_dir, early_stopper=False,
                   label="trn_F1")
     l3 = ax2.plot(x_values, results['train_mean_acc'].tolist(), 'g.-',
                   label="trn_acc")
-    l4 = ax1.plot(x_values, results['val_loss'].tolist(), 'b.-',
-                  label="val_loss")
-    l5 = ax2.plot(x_values, results['val_mean_fscore'].tolist(), 'k.-',
-                  label="val_F1")
-    l6 = ax2.plot(x_values, results['val_mean_acc'].to_list(), 'y.-',
-                  label="val_acc")
-    lns = l1 + l2 + l3 + l4 + l5 + l6
+    if val:
+        l4 = ax1.plot(x_values, results['val_loss'].tolist(), 'b.-',
+                      label="val_loss")
+        l5 = ax2.plot(x_values, results['val_mean_fscore'].tolist(), 'k.-',
+                      label="val_F1")
+        l6 = ax2.plot(x_values, results['val_mean_acc'].to_list(), 'y.-',
+                      label="val_acc")
+        lns = l1 + l2 + l3 + l4 + l5 + l6
+    else:
+        lns = l1 + l2 + l3
     labs = [l.get_label() for l in lns]
     plt.legend(lns, labs, bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
                ncol=2, mode="expand", borderaxespad=0.)

@@ -528,21 +528,31 @@ def record_top_results(current_results, scores, epoch):
         best_res: list - updated best result and epoch of discovery
     """
     if current_results[8] > .86:
-        train_f = current_results[9] / 4
-        train_loss = current_results[10] / 10
-        dev_f = current_results[-6]
-        dev_loss = current_results[-5] / 10
-        total = train_f - train_loss + dev_f - dev_loss
-        if total > scores[0]:
-            best_res = [total, current_results[8], current_results[0],
-                        current_results[1], current_results[9],
-                        current_results[6], current_results[7],
-                        current_results[10], current_results[23],
-                        current_results[15], current_results[16], dev_f,
-                        current_results[21], current_results[22],
-                        current_results[25], epoch]
+        if validate:
+            train_f = current_results[9] / 4
+            train_loss = current_results[10] / 10
+            dev_f = current_results[-6]
+            dev_loss = current_results[-5] / 10
+            total = train_f - train_loss + dev_f - dev_loss
+            if total > scores[0]:
+                best_res = [total, current_results[8], current_results[0],
+                            current_results[1], current_results[9],
+                            current_results[6], current_results[7],
+                            current_results[10], current_results[23],
+                            current_results[15], current_results[16], dev_f,
+                            current_results[21], current_results[22],
+                            current_results[25], epoch]
+            else:
+                best_res = scores
         else:
-            best_res = scores
+            if current_results[8] > scores[0]:
+                best_res = [current_results[8], current_results[8],
+                            current_results[0],
+                            current_results[1], current_results[9],
+                            current_results[6], current_results[7],
+                            current_results[10], 0, 0, 0, 0, 0, 0, 0, epoch]
+            else:
+                best_res = scores
     else:
         best_res = scores
 
@@ -636,7 +646,8 @@ def update_complete_results(complete_results, avg_counter, placeholder,
     complete_results[9] = np.mean(complete_results[6:8])
     complete_results[24] = np.mean(complete_results[21:23])
     print_log_results(placeholder, complete_results[0:15], 'train')
-    print_log_results(placeholder, complete_results[15:], 'dev')
+    if validate:
+        print_log_results(placeholder, complete_results[15:], 'dev')
 
     best_scores = record_top_results(complete_results,
                                      best_scores,
@@ -760,7 +771,9 @@ def final_organisation(scores, train_pred, val_pred, df, patience, epoch,
     """
     main_logger.info(f"Best epoch at: {scores[-1]}")
     main_logger.info(f"Best Train Acc: {scores[1]}\nBest Train Fscore:"
-                     f" {scores[4]}\nBest Train Loss: {scores[7]}\nBest Val "
+                     f" {scores[4]}\nBest Train Loss: {scores[7]}")
+    if validate:
+        main_logger.info(f"Best Val "
                      f"Acc: {scores[8]}\nBest Val Fscore: {scores[11]}\nBest "
                      f"Val Loss: {scores[14]}")
 
@@ -1011,7 +1024,7 @@ def train(model, workspace_files_dir):
         start_epoch = 0
         # train_acc, train_fscore, train_loss, val_acc, val_fscore, val_loss
 
-    avg_counter = per_epoch_train_pred = 0
+    avg_counter = per_epoch_train_pred = per_epoch_val_pred = 0
     # Train/Val, Accuracy, Precision, Recall, Fscore, Loss(single), mean_acc/f
     complete_results = np.zeros(30)
 
@@ -1093,20 +1106,20 @@ def train(model, workspace_files_dir):
                     logger=main_logger,
                     gender_balance=gender_balance)
 
-                complete_results, best_scores = \
-                    update_complete_results(complete_results,
-                                            avg_counter,
-                                            placeholder,
-                                            best_scores)
-                avg_counter = 0
-                df.loc[placeholder-1] = complete_results
+            complete_results, best_scores = \
+                update_complete_results(complete_results,
+                                        avg_counter,
+                                        placeholder,
+                                        best_scores)
+            avg_counter = 0
+            df.loc[placeholder-1] = complete_results
 
-                complete_results = np.zeros(30)
-                plot_graph(placeholder,
-                           df,
-                           final_iteration,
-                           model_dir,
-                           vis=vis)
+            complete_results = np.zeros(30)
+            plot_graph(placeholder,
+                       df,
+                       final_iteration,
+                       model_dir,
+                       vis=vis, val=validate)
 
             comp_train_pred, comp_val_pred = compile_train_val_pred(
                 per_epoch_train_pred,
@@ -1155,7 +1168,8 @@ def train(model, workspace_files_dir):
                                final_iteration,
                                model_dir,
                                early_stopper=True,
-                               vis=vis)
+                               vis=vis,
+                               val=validate)
                     break
             elif placeholder == final_iteration:
                 final_organisation(best_scores,
