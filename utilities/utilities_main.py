@@ -12,7 +12,7 @@ import torch
 import random
 
 
-def save_model(epoch_iter, model, optimizer, main_logger, model_dir):
+def save_model(epoch_iter, model, optimizer, main_logger, model_dir, cuda):
     """
     Saves the model weights along with the current epoch and all the random
     states that are used during the experiment. Also saves the current state
@@ -28,22 +28,31 @@ def save_model(epoch_iter, model, optimizer, main_logger, model_dir):
                     can be restored from a checkpoint. This includes the
                     current pointer of ones and zeros and the current list of
                     indexes of the ones and zeros
+        cuda: bool - Set True to use GPU (set in initial arguments)
     """
     print('Saving the Model at epoch: ', epoch_iter)
     main_logger.info(f"Saving the model at epoch_iter: {epoch_iter}")
-    save_out_dict = {'epoch': epoch_iter,
-                     'state_dict': model.state_dict(),
-                     'optimizer': optimizer.state_dict(),
-                     'rng_state': torch.get_rng_state(),
-                     'cuda_rng_state': torch.cuda.get_rng_state(),
-                     'numpy_rng_state': np.random.get_state(),
-                     'random_rng_state': random.getstate()}
+    if cuda:
+        save_out_dict = {'epoch': epoch_iter,
+                         'state_dict': model.state_dict(),
+                         'optimizer': optimizer.state_dict(),
+                         'rng_state': torch.get_rng_state(),
+                         'cuda_rng_state': torch.cuda.get_rng_state(),
+                         'numpy_rng_state': np.random.get_state(),
+                         'random_rng_state': random.getstate()}
+    else:
+        save_out_dict = {'epoch': epoch_iter,
+                         'state_dict': model.state_dict(),
+                         'optimizer': optimizer.state_dict(),
+                         'rng_state': torch.get_rng_state(),
+                         'numpy_rng_state': np.random.get_state(),
+                         'random_rng_state': random.getstate()}
     save_out_path = os.path.join(model_dir,
                                  f"md_{epoch_iter}_epochs.pth")
     torch.save(save_out_dict, save_out_path)
 
 
-def load_model(checkpoint_path, model, optimizer):
+def load_model(checkpoint_path, model, optimizer, cuda):
     """
     Loads the model weights along with the current epoch and all the random
     states that are used during the experiment. Also loads the current state
@@ -53,6 +62,7 @@ def load_model(checkpoint_path, model, optimizer):
         checkpoint_path: Location of the saved model
         model: The model from current experiment
         optimizer: The current optimiser state
+        cuda: bool - Set True to use GPU (set in initial arguments)
 
     Outputs:
         epoch_iter: Current epoch
@@ -67,7 +77,8 @@ def load_model(checkpoint_path, model, optimizer):
     optimizer.load_state_dict(checkpoint['optimizer'])
     epoch = checkpoint['epoch']
     torch.set_rng_state(checkpoint['rng_state'])
-    torch.cuda.set_rng_state(checkpoint['cuda_rng_state'])
+    if cuda:
+        torch.cuda.set_rng_state(checkpoint['cuda_rng_state'])
     np.random.set_state(checkpoint['numpy_rng_state'])
     random.setstate(checkpoint['random_rng_state'])
 

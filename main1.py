@@ -1019,7 +1019,8 @@ def train(model, workspace_files_dir):
     if checkpoint:
         start_epoch = util.load_model(checkpoint_run,
                                       model,
-                                      optimizer)
+                                      optimizer,
+                                      cuda)
     else:
         start_epoch = 0
         # train_acc, train_fscore, train_loss, val_acc, val_fscore, val_loss
@@ -1138,7 +1139,8 @@ def train(model, workspace_files_dir):
                             model,
                             optimizer,
                             main_logger,
-                            model_dir)
+                            model_dir,
+                            cuda)
             util.save_model_outputs(model_dir,
                                     df,
                                     comp_train_pred,
@@ -1239,7 +1241,8 @@ def test():
 
         _ = util.load_model(checkpoint_path=model_dir,
                             model=model,
-                            optimizer=optimizer)
+                            optimizer=optimizer,
+                            cuda=cuda)
         data_saver = util.load_model_outputs(model_dir,
                                              'test')
 
@@ -1310,6 +1313,7 @@ def test():
 
             scores[8] = np.mean(scores[0:2])
             scores[9] = np.mean(scores[6:8])
+            # Avg_acc, Acc_0, Acc_1, F_Score_avg, F_Score_0, F_Score_1, tn_fp_fn_tp
             scores = [scores[8], scores[0], scores[1], scores[9],
                       scores[6], scores[7], scores[11], scores[12],
                       scores[13], scores[14]]
