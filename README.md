@@ -1,3 +1,6 @@
+**Credit**
+This repository relates to our work in the EUSIPCO 2021 paper, "Gender Bias in Depression Detection Using Audio Features", https://arxiv.org/abs/2010.15120
+
 **Prerequisites**
 
 This was develpoed for Ubuntu (18.04) with Python 3
