@@ -53,7 +53,6 @@ def evaluation_for_test(results_dict, num_class, f_score, main_logger):
                       instances of each folder
         num_class: int - Number of classes in the dataset
         f_score: str - Type of F1 Score processing
-
     Outputs:
         scores: List - contains accuracy, fscore and tn_fp_fn_tp
     """
@@ -1211,15 +1210,16 @@ def test():
         if config.EXPERIMENT_DETAILS['SPLIT_BY_GENDER']:
             results = {'female': {'output': {}, 'target': {}, 'accum': {}},
                        'male': {'output': {}, 'target': {}, 'accum': {}}}
-    else:
-        results = {'output': {}, 'target': {}}
 
     for exp_num in range(exp_runthrough):
         model_dir = os.path.join(current_dir,
                                  'model',
                                  folder_extensions[exp_num])
-        path_to_logger_for_test = os.path.join(features_dir,
-                                               sub_dir + '_test')
+        if data_type == 'test':
+            path_to_logger_for_test = os.path.join(features_dir,
+                                                   sub_dir + '_test')
+        else:
+            path_to_logger_for_test = None
 
         if data_type == 'test' and counter == 0 or data_type == 'dev':
             main_logger, model, _, _, _ = setup(current_dir,
@@ -1228,6 +1228,7 @@ def test():
                                                 path_to_logger_for_test)
         num_of_classes = len(config_dataset.LABELS)
 
+        optimizer = torch.optim.Adam(model.parameters())
         gender_balance = config.EXPERIMENT_DETAILS['USE_GENDER_WEIGHTS']
 
         for file in os.listdir(model_dir):
@@ -1237,6 +1238,7 @@ def test():
 
         _ = util.load_model(checkpoint_path=model_dir,
                             model=model,
+                            optimizer=optimizer,
                             cuda=cuda)
         data_saver = util.load_model_outputs(model_dir,
                                              'test')
@@ -1305,13 +1307,6 @@ def test():
                                          current_epoch,
                                          main_logger,
                                          gender_balance)
-            for pointer, f in enumerate(per_epoch[-1]):
-                if f not in results['output'].keys():
-                    results['output'][f] = np.array(per_epoch[0][pointer, 0])
-                    results['target'][f] = per_epoch[0][pointer, -1]
-                else:
-                    results['output'][f] = np.append(
-                        results['output'][f], per_epoch[0][pointer, 0])
 
             scores[8] = np.mean(scores[0:2])
             scores[9] = np.mean(scores[6:8])
@@ -1360,14 +1355,9 @@ def test():
             main_logger.info(f"Test output Scores: {comp_scores}")
     else:
         # Acc_avg, Acc_0, Acc_1, F_avg, F_0, F_1, tn_fp_fn_tp
-        if prediction_metric == 1:
-            comp_scores_avg = np.mean(comp_scores, axis=0)
-            print(f"\nAverage: {comp_scores_avg}")
-            main_logger.info(f"Average Scores: \n{comp_scores_avg}")
-        elif prediction_metric == 0:
-            pass
-        elif prediction_metric == 2:
-            pass
+        comp_scores_avg = np.mean(comp_scores, axis=0)
+        print(f"\nAverage: {comp_scores_avg}")
+        main_logger.info(f"Average Scores: \n{comp_scores_avg}")
     if data_type == 'dev' and config.EXPERIMENT_DETAILS['SPLIT_BY_GENDER']:
         tp1 = np.sum(comp_scores[:, 9])
         fn1 = np.sum(comp_scores[:, 8])
