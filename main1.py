@@ -23,6 +23,8 @@ import pickle
 from exp_run.models_pytorch import CustomMel7 as CustomMel
 from exp_run.models_pytorch import CustomRaw1 as CustomRaw
 from exp_run import config_1 as config
+import warnings
+warnings.filterwarnings('ignore')
 learn_rate_factor = 2
 EPS = 1e-12
 
@@ -356,7 +358,7 @@ def evaluate(model, generator, data_type, class_weights, comp_res, class_num,
         return complete_results, (per_epoch_pred, intermediate_outputs, \
                intermediate_counter, intermediate_targets)
     else:
-        return complete_results, per_epoch_pred
+        return complete_results, (per_epoch_pred, folders)
 
 
 def logging_info(current_dir, data_type=''):
@@ -375,11 +377,12 @@ def logging_info(current_dir, data_type=''):
         main_logger: logger - The created logger
     """
     if mode == 'test':
+        pm = {0: 'best', 1: 'avg', 2: 'mv'}
+        log_path = current_dir + '/' + pm[prediction_metric]
         if data_type == 'test':
-            log_path = os.path.join(current_dir, "test.log")
+            log_path = log_path + '_test.log'
         elif data_type == 'dev':
-            log_path = os.path.join(current_dir, 'log',
-                                    f"model_test.log")
+            log_path = log_path + '_val_test.log'
     else:
         log_path = os.path.join(current_dir, 'log',
                                 f"model_{folder_extensions[i]}.log")
@@ -416,11 +419,10 @@ def create_model():
     """
     if config.EXPERIMENT_DETAILS['FEATURE_EXP'] == 'mel':
         model = CustomMel()
-    else:
+    elif config.EXPERIMENT_DETAILS['FEATURE_EXP'] == 'raw':
         model = CustomRaw()
     if cuda:
         model.cuda()
-
     return model
 
 
@@ -497,12 +499,9 @@ def setup(current_dir, model_dir, data_type='', path_to_logger_for_test=None):
     elif os.path.exists(current_dir) and not os.path.exists(model_dir):
         os.mkdir(model_dir)
 
-    if mode == 'test' and path_to_logger_for_test is not None and data_type \
-            == 'test':
-        if os.path.exists(path_to_logger_for_test):
-            shutil.rmtree(path_to_logger_for_test, ignore_errors=False,
-                          onerror=None)
-        os.mkdir(path_to_logger_for_test)
+    if mode == 'test' and path_to_logger_for_test is not None:
+        if not os.path.exists(path_to_logger_for_test):
+            os.mkdir(path_to_logger_for_test)
         main_logger = logging_info(path_to_logger_for_test,
                                    data_type)
     else:
@@ -510,7 +509,6 @@ def setup(current_dir, model_dir, data_type='', path_to_logger_for_test=None):
                                    data_type)
 
     model = create_model()
-
     return main_logger, model, checkpoint_run, checkpoint, next_exp
 
 
@@ -1042,8 +1040,8 @@ def train(model, workspace_files_dir):
             start_timer = time.time()
             start_new_timer = False
         avg_counter += 1
-        model.train()
         batch_labels = torch.LongTensor(batch[1])
+        model.train()
         batch_output = get_output_from_model(model=model,
                                              data=batch[0])
         batch_folders = batch[2]
@@ -1084,7 +1082,7 @@ def train(model, workspace_files_dir):
             if analysis_mode == 'epoch':
                 placeholder = batch[-2]
             else:
-                placeholder = iteration_epoch // learn_rate_factor
+                placeholder = (iteration+1) // iteration_epoch
 
             if validate:
                 start_new_timer = True
@@ -1124,7 +1122,7 @@ def train(model, workspace_files_dir):
 
             comp_train_pred, comp_val_pred = compile_train_val_pred(
                 per_epoch_train_pred,
-                per_epoch_val_pred,
+                per_epoch_val_pred[0],
                 comp_train_pred,
                 comp_val_pred,
                 placeholder)
@@ -1213,16 +1211,15 @@ def test():
         if config.EXPERIMENT_DETAILS['SPLIT_BY_GENDER']:
             results = {'female': {'output': {}, 'target': {}, 'accum': {}},
                        'male': {'output': {}, 'target': {}, 'accum': {}}}
+    else:
+        results = {'output': {}, 'target': {}}
 
     for exp_num in range(exp_runthrough):
         model_dir = os.path.join(current_dir,
                                  'model',
                                  folder_extensions[exp_num])
-        if data_type == 'test':
-            path_to_logger_for_test = os.path.join(features_dir,
-                                                   sub_dir + '_test')
-        else:
-            path_to_logger_for_test = None
+        path_to_logger_for_test = os.path.join(features_dir,
+                                               sub_dir + '_test')
 
         if data_type == 'test' and counter == 0 or data_type == 'dev':
             main_logger, model, _, _, _ = setup(current_dir,
@@ -1231,7 +1228,6 @@ def test():
                                                 path_to_logger_for_test)
         num_of_classes = len(config_dataset.LABELS)
 
-        optimizer = torch.optim.Adam(model.parameters())
         gender_balance = config.EXPERIMENT_DETAILS['USE_GENDER_WEIGHTS']
 
         for file in os.listdir(model_dir):
@@ -1241,7 +1237,6 @@ def test():
 
         _ = util.load_model(checkpoint_path=model_dir,
                             model=model,
-                            optimizer=optimizer,
                             cuda=cuda)
         data_saver = util.load_model_outputs(model_dir,
                                              'test')
@@ -1310,6 +1305,13 @@ def test():
                                          current_epoch,
                                          main_logger,
                                          gender_balance)
+            for pointer, f in enumerate(per_epoch[-1]):
+                if f not in results['output'].keys():
+                    results['output'][f] = np.array(per_epoch[0][pointer, 0])
+                    results['target'][f] = per_epoch[0][pointer, -1]
+                else:
+                    results['output'][f] = np.append(
+                        results['output'][f], per_epoch[0][pointer, 0])
 
             scores[8] = np.mean(scores[0:2])
             scores[9] = np.mean(scores[6:8])
@@ -1358,9 +1360,14 @@ def test():
             main_logger.info(f"Test output Scores: {comp_scores}")
     else:
         # Acc_avg, Acc_0, Acc_1, F_avg, F_0, F_1, tn_fp_fn_tp
-        comp_scores_avg = np.mean(comp_scores, axis=0)
-        print(f"\nAverage: {comp_scores_avg}")
-        main_logger.info(f"Average Scores: \n{comp_scores_avg}")
+        if prediction_metric == 1:
+            comp_scores_avg = np.mean(comp_scores, axis=0)
+            print(f"\nAverage: {comp_scores_avg}")
+            main_logger.info(f"Average Scores: \n{comp_scores_avg}")
+        elif prediction_metric == 0:
+            pass
+        elif prediction_metric == 2:
+            pass
     if data_type == 'dev' and config.EXPERIMENT_DETAILS['SPLIT_BY_GENDER']:
         tp1 = np.sum(comp_scores[:, 9])
         fn1 = np.sum(comp_scores[:, 8])
@@ -1385,6 +1392,11 @@ def test():
         main_logger.info(f"Female and Male Confusion Matrices")
         main_logger.info(matrix1)
         main_logger.info(matrix2)
+
+    handlers = main_logger.handlers[:]
+    for handler in handlers:
+        handler.close()
+        main_logger.removeHandler(handler)
 
 
 if __name__ == '__main__':
@@ -1494,7 +1506,8 @@ if __name__ == '__main__':
     if args.mode == 'train':
         for i in range(exp_runthrough):
             model_dir = os.path.join(current_dir, 'model', folder_extensions[i])
-            main_logger, model, checkpoint_run, checkpoint, next_exp = setup(
+            main_logger, model, checkpoint_run, checkpoint, \
+            next_exp = setup(
                 current_dir,
                 model_dir)
             if next_exp:
@@ -1518,6 +1531,7 @@ if __name__ == '__main__':
                 main_logger.removeHandler(handler)
             chosen_seed += 100
     elif args.mode == 'test':
+        model = create_model()
         test()
     else:
         raise Exception('There has been an error in the input arguments')

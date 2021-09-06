@@ -98,6 +98,9 @@ class GenerateData:
             stats = self.train_feat[for_stats]
             self.mean, self.standard_deviation = self.calculate_stats(stats)
 
+    def get_stats(self):
+        return self.mean, self.standard_deviation
+
     def calculate_stats(self, x):
         """
         Calculates the mean and the standard deviation of the input

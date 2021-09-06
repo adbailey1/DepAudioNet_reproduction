@@ -10,6 +10,7 @@ import csv
 import shutil
 import torch
 import random
+from exp_run import config_process
 
 
 def save_model(epoch_iter, model, optimizer, main_logger, model_dir, cuda):
@@ -52,7 +53,7 @@ def save_model(epoch_iter, model, optimizer, main_logger, model_dir, cuda):
     torch.save(save_out_dict, save_out_path)
 
 
-def load_model(checkpoint_path, model, optimizer, cuda):
+def load_model(checkpoint_path, model, cuda, optimizer=None):
     """
     Loads the model weights along with the current epoch and all the random
     states that are used during the experiment. Also loads the current state
@@ -74,7 +75,8 @@ def load_model(checkpoint_path, model, optimizer, cuda):
     """
     checkpoint = torch.load(checkpoint_path)
     model.load_state_dict(checkpoint['state_dict'], strict=False)
-    optimizer.load_state_dict(checkpoint['optimizer'])
+    if optimizer is not None:
+        optimizer.load_state_dict(checkpoint['optimizer'])
     epoch = checkpoint['epoch']
     torch.set_rng_state(checkpoint['rng_state'])
     if cuda:
@@ -487,6 +489,27 @@ def csv_read(file, start=None, end=None):
                     data.append(row[start:end])
                 else:
                     data.append(row)
+    label_checker(data)
+    return data
+
+
+def label_checker(data):
+    """
+    Check the labels loaded from the .csv files are accurate. Removes any
+    potential blank spaces
+
+    Input:
+        data: The input meta-data (folder, label, score, gender]
+
+    Return:
+        data: Corrected meta-data
+    """
+    data = [i for i in data if i != []]
+
+    for i, d in enumerate(data):
+        folder = d[0]
+        if folder in config_process.wrong_labels:
+            data[i][1] = config_process.wrong_labels[folder]
     return data
 
 

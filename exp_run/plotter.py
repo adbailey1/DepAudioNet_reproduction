@@ -57,7 +57,7 @@ def plot_spectrogram(spec, type_of_spec=''):
         spec: numpy.array - The spectrogram to be plotted
         type_of_spec: str - Used to determine the type of spectrogram
     """
-    if type_of_spec is '':
+    if type_of_spec == '':
         librosa.display.specshow(spec, x_axis='frames')
     else:
         librosa.display.specshow(spec, x_axis='frames', y_axis=type_of_spec)
@@ -113,6 +113,7 @@ def plot_graph(epoch, results, total_epochs, model_dir, early_stopper=False,
     ax1.set_xlabel('Epoch')
     ax1.set_ylabel('Loss')
     ax2.set_ylabel('Accuracy')
+    ax2.set_ylim([0, 1])
     ax1.tick_params(axis='y')
     ax2.tick_params(axis='y')
     fig.tight_layout()
