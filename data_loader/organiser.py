@@ -381,7 +381,7 @@ def find_weight(zeros, ones, config):
     return weights_dict, weights
 
 
-def data_info(labels, mode_label, logger, config):
+def data_info(labels, mode_label, logger, config, hidden_test=False):
     """
     Log the number of ones and zeros in the current set. If class_weights is
     selected, determine the balance of the dataset
@@ -458,7 +458,7 @@ def data_info(labels, mode_label, logger, config):
     return zeros, zeros_index, ones, ones_index, weights, class_weights
 
 
-def data_info_gender(labels, mode_label, logger, config):
+def data_info_gender(labels, mode_label, logger, config, hidden_test=False):
     """
     Log the number of ones and zeros in the current set. If class_weights is
     selected, determine the balance of the dataset
@@ -538,11 +538,15 @@ def data_info_gender(labels, mode_label, logger, config):
     logger.info(f"The number of female Depressed: {len(ones_index_f)}")
     logger.info(f"The number of male Depressed: {len(ones_index_m)}")
 
-    gender_weights, g_weights = gender_split_indices(zeros_f,
-                                                     ones_f,
-                                                     zeros_m,
-                                                     ones_m,
-                                                     config)
+    if not hidden_test:
+        gender_weights, g_weights = gender_split_indices(zeros_f,
+                                                         ones_f,
+                                                         zeros_m,
+                                                         ones_m,
+                                                         config)
+    else:
+        gender_weights = {i: 1 for i in labels[0]}
+        g_weights = [1, 1, 1, 1]
     zeros = [zeros_f, zeros_m]
     ones = [ones_f, ones_m]
     zeros_index = [zeros_index_f, zeros_index_m]
@@ -779,7 +783,8 @@ def determine_crops(features, labels, config, gender, logger, mode_label):
     return [min_samples, indx_to_dict]
 
 
-def organise_data(config, logger, labels, database, mode_label='train'):
+def organise_data(config, logger, labels, database, mode_label='train',
+                  hidden_test=False):
     """
     Loads the data and segments them according to the preferences in config
     file. This results in a feature array to be used for the experiments,
@@ -817,13 +822,15 @@ def organise_data(config, logger, labels, database, mode_label='train'):
     gender = config.EXPERIMENT_DETAILS['USE_GENDER_WEIGHTS']
     features = util.load_data(database,
                               labels)
-
-    min_samples = determine_crops(features,
-                                  labels,
-                                  config,
-                                  gender,
-                                  logger,
-                                  mode_label)
+    if hidden_test:
+        min_samples = {'fdep': [0, 0], 'mdep': [0, 0]}
+    else:
+        min_samples = determine_crops(features,
+                                      labels,
+                                      config,
+                                      gender,
+                                      logger,
+                                      mode_label)
 
     features, labels, loc = process_data(freq_bins,
                                          features,
@@ -841,14 +848,16 @@ def organise_data(config, logger, labels, database, mode_label='train'):
             data_info_gender(labels,
                              mode_label,
                              logger,
-                             config)
+                             config,
+                             hidden_test)
     else:
         # index in form [0, 1]
         zeros, zero_index, ones, one_index, weights, set_weights = data_info(
             labels,
             mode_label,
             logger,
-            config)
+            config,
+            hidden_test)
 
     index = [zero_index, one_index]
 
@@ -1049,7 +1058,7 @@ def run_train(config, logger, checkpoint, features_dir, data_saver, val=True):
 
 
 def run_test(config, logger, checkpoint, features_dir, data_saver,
-             tester=False):
+             tester=False, hidden_test=False):
     """
     High level function to process the training and validation data. This
     function obtains the file locations, folds for training/validation sets,
@@ -1060,6 +1069,7 @@ def run_test(config, logger, checkpoint, features_dir, data_saver,
         current_fold: Current fold for experiment to be used to determine the
                       training and validation folds
         checkpoint: Is there a checkpoint to load from?
+        hidden_test: Bool, set True if we know the test labels
 
     Outputs:
         generator: Generator for training and validation batch data loading
@@ -1121,7 +1131,8 @@ def run_test(config, logger, checkpoint, features_dir, data_saver,
                                                              logger,
                                                              labs,
                                                              database,
-                                                             mode_label=mode_lab)
+                                                             mode_label=mode_lab,
+                                                             hidden_test=hidden_test)
 
     gender_balance = config.EXPERIMENT_DETAILS['USE_GENDER_WEIGHTS']
 

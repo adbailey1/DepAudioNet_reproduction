@@ -29,7 +29,8 @@ learn_rate_factor = 2
 EPS = 1e-12
 
 
-def evaluation_for_test(results_dict, num_class, f_score, main_logger):
+def evaluation_for_test(results_dict, num_class, f_score, main_logger,
+                        hidden_test=False):
     """
     This function is only used for mode==test and data_type=='test'. Every
     prediction for each folder in the test set is accumulated to results_dict
@@ -37,7 +38,9 @@ def evaluation_for_test(results_dict, num_class, f_score, main_logger):
     predictions for each folder depending on how many times the experiment
     was run during training (e.g. 5). If the user sets argument:
     prediction_metric=0 -> the accuracy will be determined for every experiment
-    iteration (e.g. 5) and the best performing model will be selected.
+    iteration (e.g. 5) and the best performing model will be selected. NOTE:
+    This will not work if running in test mode without validation set and
+    using the test_split_Depression_AVEC2017.csv file.
     prediction_metric=1 -> the average of the accumulated predictions for
     each folder will be taken and the final score will relate to these
     averaged results.
@@ -56,7 +59,8 @@ def evaluation_for_test(results_dict, num_class, f_score, main_logger):
     Outputs:
         scores: List - contains accuracy, fscore and tn_fp_fn_tp
     """
-    temp_tar = np.array(list(results_dict['target'].values()))
+    if not hidden_test:
+        temp_tar = np.array(list(results_dict['target'].values()))
     final_results = {}
     # Pick best performing model
     if prediction_metric == 0:
@@ -65,8 +69,12 @@ def evaluation_for_test(results_dict, num_class, f_score, main_logger):
                              len(results_dict['output'].keys())))
         temp_scores = np.zeros((exp_runthrough, 15))
         for pos, f in enumerate(results_dict['output'].keys()):
-            temp_out[:, pos] = list(results_dict['output'][f] /
-                                    results_dict['accum'][f])
+            if exp_runthrough == 1:
+                temp_out[0, pos] = results_dict['output'][f] / results_dict[
+                    'accum'][f]
+            else:
+                temp_out[:, pos] = list(results_dict['output'][f] /
+                                        results_dict['accum'][f])
         for exp in range(exp_runthrough):
             temp_scores[exp, :], _ = prediction_and_accuracy(temp_out[exp, :],
                                                              temp_tar,
@@ -90,14 +98,17 @@ def evaluation_for_test(results_dict, num_class, f_score, main_logger):
             final_results[f] = np.average(
                 results_dict['output'][f] / results_dict['accum'][f])
         temp_out = np.array(list(final_results.values()))
-        scores, _ = prediction_and_accuracy(temp_out,
-                                            temp_tar,
-                                            True,
-                                            num_class,
-                                            np.zeros(15),
-                                            0,
-                                            0,
-                                            f_score)
+        if not hidden_test:
+            scores, _ = prediction_and_accuracy(temp_out,
+                                                temp_tar,
+                                                True,
+                                                num_class,
+                                                np.zeros(15),
+                                                0,
+                                                0,
+                                                f_score)
+        else:
+            scores = temp_out
     # Calculate majority vote from all models
     elif prediction_metric == 2:
         print("\nPerforming majority vote on accumulated predictions")
@@ -105,18 +116,24 @@ def evaluation_for_test(results_dict, num_class, f_score, main_logger):
             final_results[f] = np.average(
                 np.round(results_dict['output'][f] / results_dict['accum'][f]))
         temp_out = np.array(list(final_results.values()))
-        scores, _ = prediction_and_accuracy(temp_out,
-                                            temp_tar,
-                                            True,
-                                            num_class,
-                                            np.zeros(15),
-                                            0,
-                                            0,
-                                            f_score)
-    scores[8] = np.mean(scores[0:2])
-    scores[9] = np.mean(scores[6:8])
-    scores = [scores[8], scores[0], scores[1], scores[9], scores[6], scores[7],
-              scores[11], scores[12], scores[13], scores[14]]
+        if not hidden_test:
+            scores, _ = prediction_and_accuracy(temp_out,
+                                                temp_tar,
+                                                True,
+                                                num_class,
+                                                np.zeros(15),
+                                                0,
+                                                0,
+                                                f_score)
+        else:
+            scores = temp_out
+    if not hidden_test:
+        scores[8] = np.mean(scores[0:2])
+        scores[9] = np.mean(scores[6:8])
+        scores = [scores[8], scores[0], scores[1], scores[9], scores[6], scores[7],
+                  scores[11], scores[12], scores[13], scores[14]]
+    else:
+        scores = np.round(scores)
 
     return scores
 
@@ -251,7 +268,8 @@ def forward(model, generate_dev, data_type):
 
 
 def evaluate(model, generator, data_type, class_weights, comp_res, class_num,
-             f_score_average, epochs, logger, gender_balance=False):
+             f_score_average, epochs, logger, gender_balance=False,
+             hidden_test=False):
     """
     Processes the validation set by creating batches, passing these through
     the model and then calculating the resulting loss and accuracy metrics.
@@ -346,18 +364,21 @@ def evaluate(model, generator, data_type, class_weights, comp_res, class_num,
 
     if gender_balance:
         targets = targets % 2
-    complete_results, per_epoch_pred = prediction_and_accuracy(outputs,
-                                                               targets,
-                                                               True,
-                                                               class_num,
-                                                               comp_res,
-                                                               loss, 0,
-                                                               f_score_average)
-    if data_type == 'test':
-        return complete_results, (per_epoch_pred, intermediate_outputs, \
-               intermediate_counter, intermediate_targets)
+    if not hidden_test:
+        complete_results, per_epoch_pred = prediction_and_accuracy(outputs,
+                                                                   targets,
+                                                                   True,
+                                                                   class_num,
+                                                                   comp_res,
+                                                                   loss, 0,
+                                                                   f_score_average)
+        if data_type == 'test':
+            return complete_results, (per_epoch_pred, intermediate_outputs, \
+                   intermediate_counter, intermediate_targets)
+        else:
+            return complete_results, (per_epoch_pred, folders)
     else:
-        return complete_results, (per_epoch_pred, folders)
+        return -1, (-1, intermediate_outputs, intermediate_counter, -1)
 
 
 def logging_info(current_dir, data_type=''):
@@ -1192,12 +1213,15 @@ def test():
     average the experiment models, calculate the majority vote of the
     experiment models.
     """
+    hidden_test = False
     if validate:
         tester = False
         data_type = 'dev'
     else:
         tester = True
         data_type = 'test'
+        if config.TEST_SPLIT_PATH.split('/')[-1] == 'test_split_Depression_AVEC2017.csv':
+            hidden_test = True
 
     counter = 0
     if config.EXPERIMENT_DETAILS['SPLIT_BY_GENDER']:
@@ -1249,7 +1273,8 @@ def test():
                                                False,
                                                features_dir,
                                                data_saver,
-                                               tester)
+                                               tester,
+                                               hidden_test)
         f_score = None
         if config.EXPERIMENT_DETAILS['SPLIT_BY_GENDER']:
             start = 0
@@ -1263,7 +1288,8 @@ def test():
                                              f_score,
                                              current_epoch,
                                              main_logger,
-                                             gender_balance)
+                                             gender_balance,
+                                             hidden_test)
 
                 scores[8] = np.mean(scores[0:2])
                 scores[9] = np.mean(scores[6:8])
@@ -1306,18 +1332,20 @@ def test():
                                          f_score,
                                          current_epoch,
                                          main_logger,
-                                         gender_balance)
+                                         gender_balance,
+                                         hidden_test)
 
-            scores[8] = np.mean(scores[0:2])
-            scores[9] = np.mean(scores[6:8])
-            # Avg_acc, Acc_0, Acc_1, F_Score_avg, F_Score_0, F_Score_1, tn_fp_fn_tp
-            scores = [scores[8], scores[0], scores[1], scores[9],
-                      scores[6], scores[7], scores[11], scores[12],
-                      scores[13], scores[14]]
+            if not hidden_test:
+                scores[8] = np.mean(scores[0:2])
+                scores[9] = np.mean(scores[6:8])
+                # Avg_acc, Acc_0, Acc_1, F_Score_avg, F_Score_0, F_Score_1, tn_fp_fn_tp
+                scores = [scores[8], scores[0], scores[1], scores[9],
+                          scores[6], scores[7], scores[11], scores[12],
+                          scores[13], scores[14]]
 
-            print("Scores: ", scores)
-            comp_scores[exp_num, :] = scores
-            main_logger.info(f"Scores are: \n{scores}")
+                print("Scores: ", scores)
+                comp_scores[exp_num, :] = scores
+                main_logger.info(f"Scores are: \n{scores}")
 
             if data_type == 'test':
                 per_epoch, outputs, accum, targets = per_epoch
@@ -1325,9 +1353,9 @@ def test():
                     if folder not in results['output'].keys():
                         results['output'][folder] = np.array(outputs[folder][0])
                         results['accum'][folder] = accum[folder]
-                        if gender_balance:
+                        if gender_balance and not hidden_test:
                             results['target'][folder] = targets[folder] % 2
-                        else:
+                        elif not gender_balance and not hidden_test:
                             results['target'][folder] = targets[folder]
                     else:
                         results['output'][folder] = np.append(
@@ -1341,7 +1369,8 @@ def test():
                 temp_scores = evaluation_for_test(results[gen_ind],
                                                   num_of_classes,
                                                   f_score,
-                                                  main_logger)
+                                                  main_logger,
+                                                  hidden_test)
                 comp_scores = comp_scores + temp_scores
                 print(f"{gen_ind} Test output Scores: {temp_scores}")
                 main_logger.info(f"{gen_ind} Test output Scores:"
@@ -1350,7 +1379,8 @@ def test():
             comp_scores = evaluation_for_test(results,
                                               num_of_classes,
                                               f_score,
-                                              main_logger)
+                                              main_logger,
+                                              hidden_test)
             print("Test output Scores: ", comp_scores)
             main_logger.info(f"Test output Scores: {comp_scores}")
     else:
@@ -1471,6 +1501,21 @@ if __name__ == '__main__':
     validate = args.validate
     position = args.position
     prediction_metric = args.prediction_metric
+    if prediction_metric == 0 and mode == 'test' and not validate:
+        if config.TEST_SPLIT_PATH.split('/')[-1] == 'test_split_Depression_AVEC2017.csv':
+            print(f"Error: In Test mode using the file"
+                  f" {config.TEST_SPLIT_PATH}, you can only use prediction "
+                  f"metric 1 or 2. Please re-run anc choose a different "
+                  f"metric")
+            sys.exit()
+    if mode == 'test' and not validate and config.TEST_SPLIT_PATH.split('/')[
+        -1] == 'test_split_Depression_AVEC2017.csv' and \
+            config.EXPERIMENT_DETAILS['SPLIT_BY_GENDER']:
+        print(f"Error: Currently you cannot use split_by_gender in the config\n"
+              f"file if you are testing the model on the test data using the\n"
+              f"{config.TEST_SPLIT_PATH} file.\n\nTo work in test mode with "
+              f"test data, set SPLIT_BY_GENDER to False")
+        sys.exit()
     workspace_main_dir = config.WORKSPACE_MAIN_DIR
     features_dir = os.path.join(workspace_main_dir, config.FOLDER_NAME)
     gender = config.GENDER

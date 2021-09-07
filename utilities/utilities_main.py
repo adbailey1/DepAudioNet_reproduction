@@ -324,7 +324,7 @@ def count_classes_gender(complete_classes):
                     zeros_m[folder] = [i]
                 else:
                     zeros_m[folder].append(i)
-        else:
+        elif complete_classes[1][i] == 1:
             if complete_classes[3][i] == 0:
                 index_ones_f.append(i)
                 if folder not in ones_f:
@@ -337,6 +337,19 @@ def count_classes_gender(complete_classes):
                     ones_m[folder] = [i]
                 else:
                     ones_m[folder].append(i)
+        else:
+            if complete_classes[3][i] == 0:
+                index_zeros_f.append(i)
+                if folder not in zeros_f:
+                    zeros_f[folder] = [i]
+                else:
+                    zeros_f[folder].append(i)
+            else:
+                index_zeros_m.append(i)
+                if folder not in zeros_m:
+                    zeros_m[folder] = [i]
+                else:
+                    zeros_m[folder].append(i)
 
     return [zeros_f, zeros_m], [index_zeros_f, index_zeros_m], \
            [ones_f, ones_m], [index_ones_f, index_ones_m], indices_comp
