@@ -962,7 +962,7 @@ def run_train(config, logger, checkpoint, features_dir, data_saver, val=True):
     dev_labels = np.concatenate((dev_labels, dev_indices.reshape(1, -1)))
 
     if not val:
-        train_labels = np.vstack((train_labels, dev_labels))
+        train_labels = np.hstack((train_labels, dev_labels))
 
     # class data is tuple (Dict(zeros), Dict(ones), Dict(weights), set_weights)
     train_features, train_labels, train_index, train_loc, class_data = \
